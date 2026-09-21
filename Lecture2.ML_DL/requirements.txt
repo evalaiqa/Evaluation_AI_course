@@ -4,7 +4,7 @@ numpy
 scikit-learn
 seaborn
 matplotlib
-tensorflow-macos
+tensorflow
 pandas
 wandb
 pytorch_lightning

@@ -1,7 +1,7 @@
 # regression.py
 
 # =============================================================================
-# MSE ДЛЯ ГЛУБОКОГО ОБУЧЕНИЯ - РЕАЛЬНЫЙ ДАТАСЕТ О НЕДВИЖИМОСТИ (Только стандартная модель)
+# MSE ДЛЯ ГЛУБОКОГО ОБУЧЕНИЯ — РЕАЛЬНЫЙ ДАТАСЕТ О ЖИЛЬЕ (только стандартная модель)
 # =============================================================================
 import pandas as pd
 from tensorflow import keras
@@ -18,7 +18,7 @@ import time
 
 
 class TimeCallback(keras.callbacks.Callback):
-    """Callback для отслеживания времени обучения"""
+    """Колбэк для отслеживания времени обучения"""
 
     def __init__(self, print_every=5):
         super().__init__()
@@ -30,7 +30,7 @@ class TimeCallback(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         if epoch % self.print_every == 0:
             elapsed_time = time.time() - self.start_time
-            print(f"⏱️ Эпоха {epoch + 1}: {elapsed_time:.1f}s общее время")
+            print(f"⏱️ Epoch {epoch + 1}: {elapsed_time:.1f}s total time")
 
 
 class DataLoader:
@@ -40,10 +40,14 @@ class DataLoader:
         self.data = None
         self.scaler_X = StandardScaler()
         self.scaler_y = StandardScaler()
+        # target_scale = сколько долларов приходится на 1 единицу сырого таргета.
+        # California Housing: таргет измеряется в $100k, поэтому множитель = 100_000.
+        # Diamonds: таргет уже в $, поэтому множитель = 1.0 (см. load_diamonds).
+        self.target_scale = 100_000.0
 
     def load_california_housing(self):
         """Загружает датасет California Housing"""
-        print("\n📊 Загружаем реальный датасет California Housing...")
+        print("\n📊 Loading the real California Housing dataset...")
 
         california_housing = fetch_california_housing()
         feature_names = california_housing.feature_names
@@ -53,12 +57,42 @@ class DataLoader:
         df = pd.DataFrame(X, columns=feature_names)
         df['target'] = y
         self.data = df
+        self.target_scale = 100_000.0  # 1 единица таргета = $100 000
+
+        return df
+
+    def load_diamonds(self):
+        """
+        Загружает датасет Diamonds (из seaborn) — по аналогии с load_california_housing.
+        """
+        print("\n💎 Loading the Diamonds dataset...")
+
+        df = sns.load_dataset('diamonds').dropna().copy()
+
+        # В Diamonds есть 3 категориальных столбца (cut, color, clarity), которые по природе ПОРЯДКОВЫЕ.
+        # Кодируем их упорядоченными кодами категорий, чтобы стандартный StandardScaler в prepare_data работал.
+        cut_order = ['Fair', 'Good', 'Very Good', 'Premium', 'Ideal']
+        color_order = ['J', 'I', 'H', 'G', 'F', 'E',
+                       'D']            # J = худший → D = лучший
+        clarity_order = ['I1', 'SI2', 'SI1',
+                         'VS2', 'VS1', 'VVS2', 'VVS1', 'IF']
+        df['cut'] = pd.Categorical(
+            df['cut'], categories=cut_order, ordered=True).codes
+        df['color'] = pd.Categorical(
+            df['color'], categories=color_order, ordered=True).codes
+        df['clarity'] = pd.Categorical(
+            df['clarity'], categories=clarity_order, ordered=True).codes
+
+        # Переименовываем 'price' → 'target', чтобы остальной конвейер работал без изменений (drop('target', axis=1)).
+        df = df.rename(columns={'price': 'target'})
+        self.data = df
+        self.target_scale = 1.0  # таргет уже в долларах — умножение на 100k не нужно
 
         return df
 
     def prepare_data(self, test_size=0.2, val_size=0.25, random_state=42):
         """
-        Подготавливает данные для обучения
+        Готовит данные для обучения.
 
         Args:
             test_size: размер тестовой выборки
@@ -68,7 +102,7 @@ class DataLoader:
         Returns:
             Кортеж с обучающими, валидационными и тестовыми данными
         """
-        print("\n🔧 Подготовка данных для глубокого обучения...")
+        print("\n🔧 Preparing data for deep learning...")
 
         X = self.data.drop('target', axis=1).values
         y = self.data['target'].values
@@ -77,7 +111,7 @@ class DataLoader:
         X_scaled = self.scaler_X.fit_transform(X)
         y_scaled = self.scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
 
-        # Разделение данных
+        # Разбиваем данные
         X_temp, X_test, y_temp, y_test = train_test_split(
             X_scaled, y_scaled, test_size=test_size, random_state=random_state
         )
@@ -85,20 +119,20 @@ class DataLoader:
             X_temp, y_temp, test_size=val_size, random_state=random_state
         )
 
-        print(f"📊 Размер обучающей выборки: {X_train.shape}")
-        print(f"📊 Размер валидационной выборки: {X_val.shape}")
-        print(f"📊 Размер тестовой выборки: {X_test.shape}")
+        print(f"📊 Training set size: {X_train.shape}")
+        print(f"📊 Validation set size: {X_val.shape}")
+        print(f"📊 Test set size: {X_test.shape}")
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
 
 class ModelBuilder:
-    """Класс для создания и компиляции стандартной модели"""
+    """Класс для построения и компиляции стандартной модели"""
 
     @staticmethod
     def create_deep_housing_model(input_dim):
         """
-        Создает оптимизированную нейронную сеть для предсказания стоимости недвижимости (стандартная MSE)
+        Создаёт оптимизированную нейросеть для предсказания цен на жильё (стандартный MSE)
         """
         model = keras.Sequential([
             layers.Dense(64, activation='relu', input_shape=(input_dim,)),
@@ -129,7 +163,7 @@ class ModelTrainer:
         self.training_times = {}
 
     def setup_callbacks(self):
-        """Настраивает callbacks для обучения"""
+        """Настраивает колбэки для обучения"""
         early_stopping = keras.callbacks.EarlyStopping(
             monitor='val_loss',
             patience=5,
@@ -151,9 +185,9 @@ class ModelTrainer:
 
     def train_model(self, model, model_name, X_train, y_train, X_val, y_val, epochs=20, batch_size=256):
         """
-        Обучает модель
+        Обучает модель.
         """
-        print(f"\nОбучение модели {model_name}...")
+        print(f"\nTraining model {model_name}...")
         start_time = time.time()
 
         callbacks = self.setup_callbacks()
@@ -174,37 +208,40 @@ class ModelTrainer:
         self.training_times[model_name] = training_time
 
         print(
-            f"⏱️ Время обучения модели {model_name}: {training_time:.2f} секунд")
+            f"⏱️ Training time for {model_name}: {training_time:.2f} seconds")
         return history
 
     def diagnose_training_time(self):
-        """Диагностирует время обучения"""
+        """Выводит отчёт о времени обучения"""
         total_time = sum(self.training_times.values())
-        print(f"⏱️ Общее время обучения: {total_time:.2f} секунд")
+        print(f"⏱️ Total training time: {total_time:.2f} seconds")
         if total_time > 300:
             print(
-                f"⚠️ ВНИМАНИЕ: {total_time:.1f}s — слишком долго. Проверь размеры модели/данные/TF.")
+                f"⚠️ WARNING: {total_time:.1f}s - too slow. Check model size / data / TF.")
         elif total_time > 180:
-            print(f"⚠️ {total_time:.1f}s — можно ускорить.")
+            print(f"⚠️ {total_time:.1f}s - could be faster.")
         else:
-            print(f"✅ Время обучения оптимально: {total_time:.1f}s")
+            print(f"✅ Training time is good: {total_time:.1f}s")
 
 
 class ModelEvaluator:
     """Класс для оценки модели"""
 
-    def __init__(self, scaler_y):
+    def __init__(self, scaler_y, target_scale=100_000.0):
+        # target_scale переводит сырой таргет обратно в доллары.
+        # California Housing = 100_000 (по умолчанию), Diamonds = 1.0.
         self.scaler_y = scaler_y
+        self.target_scale = target_scale
         self.metrics = {}
 
     def evaluate_model(self, model, model_name, X_test, y_test, training_time):
         """
-        Оценивает модель и сохраняет метрики
+        Оценивает модель и сохраняет метрики.
         """
         # Предсказания (в нормализованных единицах таргета)
         y_pred = model.predict(X_test, verbose=0)
 
-        # Обратное преобразование (возвращаемся к исходной шкале датасета: "сотни тысяч $")
+        # Обратное преобразование (к исходной шкале датасета: «сотни тысяч $»)
         y_test_original_units = self.scaler_y.inverse_transform(
             y_test.reshape(-1, 1)
         ).flatten()
@@ -212,9 +249,10 @@ class ModelEvaluator:
             y_pred
         ).flatten()
 
-        # ПЕРЕВОД В ДОЛЛАРЫ: 1 ед. = 100 000 $
-        y_test_dollars = y_test_original_units * 100_000.0
-        y_pred_dollars = y_pred_original_units * 100_000.0
+        # ПЕРЕВОД В ДОЛЛАРЫ: множитель зависит от датасета
+        # (California Housing: 100_000, Diamonds: 1.0 — см. DataLoader.target_scale).
+        y_test_dollars = y_test_original_units * self.target_scale
+        y_pred_dollars = y_pred_original_units * self.target_scale
 
         # Метрики в долларах
         mse = mean_squared_error(y_test_dollars, y_pred_dollars)
@@ -228,7 +266,7 @@ class ModelEvaluator:
             'mae': mae,
             'r2': r2,
             'training_time': training_time,
-            # храним массивы тоже в долларах, чтобы все графики/печать были в $ дальше
+            # сохраняем массивы в долларах, чтобы все графики/выводы ниже были в $
             'y_test_original': y_test_dollars,
             'y_pred_original': y_pred_dollars
         }
@@ -236,7 +274,7 @@ class ModelEvaluator:
         return metrics
 
     def print_metrics(self, model_name):
-        """Печатает метрики модели (в реальных $)"""
+        """Выводит метрики модели (в реальных $)"""
         metrics = self.metrics[model_name]
         print(f"\n🔹 {model_name}:")
         print(f"   • MSE:  {metrics['mse']:.2f} $^2")
@@ -252,33 +290,33 @@ class DataVisualizer:
         self.data_loader = data_loader
 
     def plot_results(self, trainer, evaluator):
-        """Визуализация результатов обучения и оценки"""
+        """Визуализирует результаты обучения и оценки"""
         plt.figure(figsize=(20, 12))
 
-        # График 1: История обучения - Loss
+        # График 1: история обучения — Loss
         plt.subplot(2, 4, 1)
         for model_name, history in trainer.histories.items():
             plt.plot(history.history['loss'],
-                     label=f'{model_name} (обучение)', linewidth=2)
+                     label=f'{model_name} (train)', linewidth=2)
             plt.plot(history.history['val_loss'],
-                     label=f'{model_name} (валидация)', linewidth=2)
-        plt.title('История MSE Loss')
-        plt.xlabel('Эпоха')
+                     label=f'{model_name} (val)', linewidth=2)
+        plt.title('MSE Loss history')
+        plt.xlabel('Epoch')
         plt.ylabel('MSE Loss')
         plt.legend()
         plt.grid(True, alpha=0.3)
 
-        # График 2: История обучения - MAE
+        # График 2: история обучения — MAE
         plt.subplot(2, 4, 2)
         for model_name, history in trainer.histories.items():
             plt.plot(history.history['mae'], label=model_name, linewidth=2)
         plt.title('Mean Absolute Error')
-        plt.xlabel('Эпоха')
+        plt.xlabel('Epoch')
         plt.ylabel('MAE')
         plt.legend()
         plt.grid(True, alpha=0.3)
 
-        # График 3: Истина vs Предсказание
+        # График 3: истинные значения vs предсказанные
         plt.subplot(2, 4, 3)
         (model_name, metrics), = evaluator.metrics.items()
         y_test = metrics['y_test_original']
@@ -286,19 +324,19 @@ class DataVisualizer:
         plt.scatter(y_test, y_pred, alpha=0.5)
         plt.plot([y_test.min(), y_test.max()],
                  [y_test.min(), y_test.max()], 'r--', lw=2)
-        plt.xlabel('Истинная стоимость ($)')
-        plt.ylabel('Предсказанная стоимость ($)')
+        plt.xlabel('Actual price ($)')
+        plt.ylabel('Predicted price ($)')
         plt.title(f'{model_name}\nR² = {metrics["r2"]:.4f}')
         plt.grid(True, alpha=0.3)
 
-        # График 4: Остатки vs предсказания
+        # График 4: остатки vs предсказания
         plt.subplot(2, 4, 5)
         residuals = y_test - y_pred
         plt.scatter(y_pred, residuals, alpha=0.5)
         plt.axhline(y=0, color='r', linestyle='--', lw=2)
-        plt.xlabel('Предсказанная стоимость ($)')
-        plt.ylabel('Остатки ($)')
-        plt.title('Остатки vs Предсказания')
+        plt.xlabel('Predicted price ($)')
+        plt.ylabel('Residuals ($)')
+        plt.title('Residuals vs Predictions')
         plt.grid(True, alpha=0.3)
 
         plt.tight_layout()
@@ -310,15 +348,15 @@ class MSEDemo:
 
     @staticmethod
     def demonstrate_mse_on_batch(evaluator):
-        """Демонстрация работы MSE на реальном батче"""
-        print("\n🔍 ДЕМОНСТРАЦИЯ MSE НА РЕАЛЬНОМ БАТЧЕ:")
+        """Демонстрирует MSE на реальном батче"""
+        print("\n🔍 MSE DEMONSTRATION ON A REAL BATCH:")
         print("="*70)
 
         if not evaluator.metrics:
-            print("Нет данных для демонстрации")
+            print("No data to demonstrate")
             return
 
-        # Берем метрики единственной модели
+        # Берём метрики единственной модели
         (model_name, metrics), = evaluator.metrics.items()
         y_true_original = metrics['y_test_original']
         y_pred_original = metrics['y_pred_original']
@@ -329,9 +367,9 @@ class MSEDemo:
         y_true_batch = y_true_original[batch_indices]
         y_pred_batch = y_pred_original[batch_indices]
 
-        print(f"Модель: {model_name}")
-        print(f"Размер батча: {batch_size}")
-        print(f"{'№':<3} {'Истинная цена ($)':<20} {'Предсказанная ($)':<20} {'Ошибка ($)':<15} {'Ошибка² ($²)':<18}")
+        print(f"Model: {model_name}")
+        print(f"Batch size: {batch_size}")
+        print(f"{'#':<3} {'Actual price ($)':<20} {'Predicted ($)':<20} {'Error ($)':<15} {'Error^2 ($^2)':<18}")
         print("-" * 70)
 
         total_squared_error = 0.0
@@ -345,11 +383,11 @@ class MSEDemo:
                 f"{i+1:<3} {true_price:<15.2f} {pred_price:<15.2f} {error:<12.2f} {squared_error:<15.2f}")
 
         mse_batch = total_squared_error / batch_size
-        print(f"\nMSE для батча: {mse_batch:.2f} $^2")
+        print(f"\nMSE for the batch: {mse_batch:.2f} $^2")
 
 
 class HousingAnalyzer:
-    """Главный класс для анализа недвижимости"""
+    """Главный класс для анализа данных о жилье"""
 
     def __init__(self):
         self.data_loader = DataLoader()
@@ -359,49 +397,62 @@ class HousingAnalyzer:
         self.visualizer = None
         self.mse_demo = MSEDemo()
 
-    def run_analysis(self):
-        """Запуск полного анализа"""
+    def run_analysis(self, dataset="california"):
+        """
+        Запускает полный анализ.
+
+        dataset: "california" (по умолчанию) или "diamonds".
+        Между датасетами различается только вызов загрузчика;
+        весь остальной конвейер используется без изменений.
+        """
         print("="*70)
-        print("🏠 MSE ДЛЯ ГЛУБОКОГО ОБУЧЕНИЯ - РЕАЛЬНЫЙ ДАТАСЕТ О НЕДВИЖИМОСТИ")
+        print("🏠 MSE FOR DEEP LEARNING - REAL HOUSING DATASET")
         print("="*70)
 
         # 1. Загрузка данных
-        self.data_loader.load_california_housing()
+        if dataset == "diamonds":
+            self.data_loader.load_diamonds()
+        else:
+            self.data_loader.load_california_housing()
 
         # 2. Подготовка данных
         X_train, X_val, X_test, y_train, y_val, y_test = self.data_loader.prepare_data()
 
-        # 3. Создание оценщика и визуализатора
-        self.evaluator = ModelEvaluator(self.data_loader.scaler_y)
+        # 3. Создание evaluator и visualizer
+        # Передаём target_scale, чтобы метрики/графики выводились в реальных долларах для ОБОИХ датасетов.
+        self.evaluator = ModelEvaluator(
+            self.data_loader.scaler_y,
+            target_scale=self.data_loader.target_scale,
+        )
         self.visualizer = DataVisualizer(self.data_loader)
 
-        # 4. Создание и обучение стандартной модели
-        print("\n🧠 Создаем архитектуру глубокой нейронной сети (Standard MSE)...")
+        # 4. Построение и обучение стандартной модели
+        print("\n🧠 Building the deep neural network architecture (Standard MSE)...")
         model, loss_name = self.model_builder.create_deep_housing_model(
             X_train.shape[1])
 
-        print(f"\n🏗️ Архитектура нейронной сети:")
+        print(f"\n🏗️ Neural network architecture:")
         model.summary()
 
-        print("\n🚀 Обучение модели на реальных данных...")
+        print("\n🚀 Training the model on the real data...")
         history = self.trainer.train_model(
-            model, "Стандартная MSE", X_train, y_train, X_val, y_val
+            model, "Standard MSE", X_train, y_train, X_val, y_val
         )
 
-        # 5. Диагностика времени
+        # 5. Диагностика времени обучения
         self.trainer.diagnose_training_time()
 
         # 6. Оценка модели
-        print("\n🎯 Оценка модели...")
+        print("\n🎯 Model evaluation...")
         _ = self.evaluator.evaluate_model(
-            model, "Стандартная MSE", X_test, y_test,
-            self.trainer.training_times["Стандартная MSE"]
+            model, "Standard MSE", X_test, y_test,
+            self.trainer.training_times["Standard MSE"]
         )
 
-        # 7. Печать результатов
-        print(f"\n📊 РЕЗУЛЬТАТЫ НА РЕАЛЬНЫХ ДАННЫХ:")
+        # 7. Вывод результатов
+        print(f"\n📊 RESULTS ON THE REAL DATA:")
         print("="*60)
-        self.evaluator.print_metrics("Стандартная MSE")
+        self.evaluator.print_metrics("Standard MSE")
 
         # 8. Визуализация
         self.visualizer.plot_results(self.trainer, self.evaluator)
@@ -411,16 +462,18 @@ class HousingAnalyzer:
 
 
 # ============================================================================
-# ЗАПУСК ПРОГРАММЫ
+# ТОЧКА ВХОДА
 # ============================================================================
 
 def main():
-    """Главная функция для запуска анализа"""
+    """Главная функция, запускающая анализ"""
     analyzer = HousingAnalyzer()
-    analyzer.run_analysis()
+    # ДОМАШНЕЕ ЗАДАНИЕ: чтобы прогнать тот же конвейер на датасете Diamonds,
+    # просто поменяйте аргумент ниже на "diamonds".
+    analyzer.run_analysis(dataset="california")  # или: dataset="diamonds"
 
     print("\n" + "="*80)
-    print("АНАЛИЗ ЗАВЕРШЕН УСПЕШНО!")
+    print("ANALYSIS COMPLETED SUCCESSFULLY!")
     print("="*80)
 
 

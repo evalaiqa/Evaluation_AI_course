@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, top_k_accuracy_score
 from scipy.stats import entropy as scipy_entropy
 from torchmetrics.classification import MulticlassCalibrationError, MulticlassAccuracy
@@ -15,9 +14,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-# Настройка устройства для вычислений
+# Выбираем устройство для вычислений (GPU, если доступен, иначе CPU)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Используется устройство: {device}")
+print(f"Using device: {device}")
 
 # ============================================================================
 # 1. ЗАГРУЗКА И ПОДГОТОВКА ДАННЫХ (CIFAR-10)
@@ -26,36 +25,36 @@ print(f"Используется устройство: {device}")
 
 def load_cifar10_data(batch_size=128, val_split=0.1):
     """
-    Загрузка и подготовка датасета CIFAR-10 с разделением на train/validation/test
+    Загружает и готовит датасет CIFAR-10 с разбиением на train/validation/test.
 
-    CIFAR-10 содержит 60,000 цветных изображений 32x32 пикселя в 10 классах:
+    CIFAR-10 содержит 60 000 цветных изображений 32x32 в 10 классах:
     - airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck
 
     Args:
         batch_size: размер батча
-        val_split: доля валидационного набора от обучающего (0.1 = 10%)
+        val_split: доля обучающих данных для валидации (0.1 = 10%)
     """
 
-    # Определяем трансформации для обучающего набора (с аугментацией)
+    # Определяем преобразования для обучающей выборки (с аугментацией)
     transform_train = transforms.Compose([
-        # RandomHorizontalFlip: случайно отражает картинку по горизонтали (например, самолёт влево/вправо).
+        # RandomHorizontalFlip: случайно отражает изображение по горизонтали (например, самолёт влево/вправо).
         transforms.RandomHorizontalFlip(p=0.5),
-        # RandomCrop: случайно вырезает часть картинки и добавляет рамку (чтобы имитировать разные ракурсы).
+        # RandomCrop: случайно обрезает часть изображения и добавляет отступы (чтобы имитировать разные ракурсы).
         transforms.RandomCrop(32, padding=4),
-        # ToTensor: переводит картинку из формата PIL/NumPy в тензор PyTorch.
+        # ToTensor: переводит изображение из PIL/NumPy в тензор PyTorch.
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465),
                              (0.2023, 0.1994, 0.2010))  # Нормализация
     ])
 
-    # Трансформации для валидационного и тестового наборов (без аугментации)
+    # Преобразования для валидационной и тестовой выборок (без аугментации)
     transform_val_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465),
                              (0.2023, 0.1994, 0.2010))
     ])
 
-    # Загрузка исходных данных
+    # Загружаем исходные данные
     full_train_dataset = torchvision.datasets.CIFAR10(
         root='./data', train=True, download=True, transform=transform_train
     )
@@ -63,26 +62,26 @@ def load_cifar10_data(batch_size=128, val_split=0.1):
         root='./data', train=False, download=True, transform=transform_val_test
     )
 
-    # Разделение обучающего набора на train и validation
+    # Разбиваем обучающую выборку на train и validation
     train_size = int((1 - val_split) * len(full_train_dataset))
     val_size = len(full_train_dataset) - train_size
 
-    # Создание генератора для воспроизводимого разделения
+    # Создаём генератор для воспроизводимого разбиения
     generator = torch.Generator().manual_seed(42)
     train_dataset, val_dataset_temp = torch.utils.data.random_split(
         full_train_dataset, [train_size, val_size], generator=generator
     )
 
-    # Создание отдельного датасета для валидации без аугментации
+    # Собираем отдельную валидационную выборку без аугментации
     val_dataset = torchvision.datasets.CIFAR10(
         root='./data', train=True, download=False, transform=transform_val_test
     )
 
-    # Получение индексов для валидационного набора
+    # Получаем индексы для валидационной выборки
     val_indices = val_dataset_temp.indices
     val_dataset = torch.utils.data.Subset(val_dataset, val_indices)
 
-    # Создание загрузчиков данных
+    # Создаём загрузчики данных
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     val_loader = DataLoader(
@@ -94,90 +93,90 @@ def load_cifar10_data(batch_size=128, val_split=0.1):
     classes = ('plane', 'car', 'bird', 'cat', 'deer',
                'dog', 'frog', 'horse', 'ship', 'truck')
 
-    print(f"Размеры наборов данных:")
-    print(f"  - Обучающий: {len(train_dataset)} образцов")
-    print(f"  - Валидационный: {len(val_dataset)} образцов")
-    print(f"  - Тестовый: {len(test_dataset)} образцов")
+    print(f"Dataset sizes:")
+    print(f"  - Training: {len(train_dataset)} samples")
+    print(f"  - Validation: {len(val_dataset)} samples")
+    print(f"  - Test: {len(test_dataset)} samples")
 
     return train_loader, val_loader, test_loader, classes
 
 
-# def load_mnist_data(batch_size=128, val_split=0.1):
-#     """
-#     Загрузка и подготовка датасета MNIST с разделением на train/validation/test
+def load_mnist_data(batch_size=128, val_split=0.1):
+    """
+    Загружает и готовит датасет MNIST с разбиением на train/validation/test.
 
-#     MNIST содержит 70,000 изображений рукописных цифр 28x28 пикселей в оттенках серого:
-#     - цифры от 0 до 9
+    MNIST содержит 70 000 чёрно-белых изображений 28x28 рукописных цифр:
+    - цифры от 0 до 9
 
-#     Args:
-#         batch_size: размер батча
-#         val_split: доля валидационного набора от обучающего (0.1 = 10%)
-#     """
+    Args:
+        batch_size: размер батча
+        val_split: доля обучающих данных для валидации (0.1 = 10%)
+    """
 
-#     # Определяем трансформации для обучающего набора (с аугментацией)
-#     transform_train = transforms.Compose([
-#         # Случайное отражение по горизонтали (для цифр менее актуально)
-#         transforms.RandomHorizontalFlip(p=0.1),  # Уменьшили вероятность
-#         # Случайная обрезка с паддингом
-#         transforms.RandomCrop(28, padding=2),     # Меньший padding для 28x28
-#         # Случайный поворот (полезно для цифр)
-#         transforms.RandomRotation(degrees=10),
-#         transforms.ToTensor(),                    # Конвертация в тензор
-#         #  нормализация для MNIST
-#         transforms.Normalize((0.1307,), (0.3081,))
-#     ])
+    # Преобразования обучающей выборки (с аугментацией)
+    transform_train = transforms.Compose([
+        # Случайное горизонтальное отражение (для цифр менее уместно)
+        transforms.RandomHorizontalFlip(p=0.1),  # Пониженная вероятность
+        # Случайная обрезка с отступами
+        transforms.RandomCrop(28, padding=2),     # Меньший отступ для 28x28
+        # Случайный поворот (полезно для цифр)
+        transforms.RandomRotation(degrees=10),
+        transforms.ToTensor(),                    # Перевод в тензор
+        # нормализация для MNIST
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
 
-#     # Трансформации для валидационного и тестового наборов (без аугментации)
-#     transform_val_test = transforms.Compose([
-#         transforms.ToTensor(),
-#         #  нормализация для MNIST
-#         transforms.Normalize((0.1307,), (0.3081,))
-#     ])
+    # Преобразования валидационной/тестовой выборок (без аугментации)
+    transform_val_test = transforms.Compose([
+        transforms.ToTensor(),
+        # нормализация для MNIST
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
 
-#     # Загрузка MNIST вместо CIFAR-10
-#     full_train_dataset = torchvision.datasets.MNIST(
-#         root='./data', train=True, download=True, transform=transform_train
-#     )
-#     test_dataset = torchvision.datasets.MNIST(
-#         root='./data', train=False, download=True, transform=transform_val_test
-#     )
+    # Загружаем MNIST вместо CIFAR-10
+    full_train_dataset = torchvision.datasets.MNIST(
+        root='./data', train=True, download=True, transform=transform_train
+    )
+    test_dataset = torchvision.datasets.MNIST(
+        root='./data', train=False, download=True, transform=transform_val_test
+    )
 
-#     # Разделение обучающего набора на train и validation (БЕЗ ИЗМЕНЕНИЙ)
-#     train_size = int((1 - val_split) * len(full_train_dataset))
-#     val_size = len(full_train_dataset) - train_size
+    # Разбиваем обучающую выборку на train и validation (БЕЗ ИЗМЕНЕНИЙ)
+    train_size = int((1 - val_split) * len(full_train_dataset))
+    val_size = len(full_train_dataset) - train_size
 
-#     # Создание генератора для воспроизводимого разделения
-#     generator = torch.Generator().manual_seed(42)
-#     train_dataset, val_dataset_temp = torch.utils.data.random_split(
-#         full_train_dataset, [train_size, val_size], generator=generator
-#     )
+    # Генератор для воспроизводимого разбиения
+    generator = torch.Generator().manual_seed(42)
+    train_dataset, val_dataset_temp = torch.utils.data.random_split(
+        full_train_dataset, [train_size, val_size], generator=generator
+    )
 
-#     # Создание отдельного датасета для валидации без аугментации
-#     val_dataset = torchvision.datasets.MNIST(
-#         root='./data', train=True, download=False, transform=transform_val_test
-#     )
+    # Отдельная валидационная выборка без аугментации
+    val_dataset = torchvision.datasets.MNIST(
+        root='./data', train=True, download=False, transform=transform_val_test
+    )
 
-#     # Получение индексов для валидационного набора
-#     val_indices = val_dataset_temp.indices
-#     val_dataset = torch.utils.data.Subset(val_dataset, val_indices)
+    # Получаем индексы для валидационной выборки
+    val_indices = val_dataset_temp.indices
+    val_dataset = torch.utils.data.Subset(val_dataset, val_indices)
 
-#     # Создание загрузчиков данных (БЕЗ ИЗМЕНЕНИЙ)
-#     train_loader = DataLoader(
-#         train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
-#     val_loader = DataLoader(
-#         val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-#     test_loader = DataLoader(
-#         test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    # Создаём загрузчики данных (БЕЗ ИЗМЕНЕНИЙ)
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    val_loader = DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+    test_loader = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
-#     # Названия классов MNIST
-#     classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
+    # Названия классов MNIST
+    classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 
-#     print(f"Размеры наборов данных:")
-#     print(f"  - Обучающий: {len(train_dataset)} образцов")
-#     print(f"  - Валидационный: {len(val_dataset)} образцов")
-#     print(f"  - Тестовый: {len(test_dataset)} образцов")
+    print(f"Dataset sizes:")
+    print(f"  - Training: {len(train_dataset)} samples")
+    print(f"  - Validation: {len(val_dataset)} samples")
+    print(f"  - Test: {len(test_dataset)} samples")
 
-#     return train_loader, val_loader, test_loader, classes
+    return train_loader, val_loader, test_loader, classes
 
 # ============================================================================
 # 2. ОПРЕДЕЛЕНИЕ АРХИТЕКТУРЫ НЕЙРОННОЙ СЕТИ
@@ -186,7 +185,7 @@ def load_cifar10_data(batch_size=128, val_split=0.1):
 
 class SimpleCNN_CIFAR(nn.Module):
     """
-    Простая сверточная нейронная сеть для классификации CIFAR
+    Простая свёрточная нейронная сеть для классификации CIFAR
     """
 
     def __init__(self, num_classes=10):
@@ -202,19 +201,19 @@ class SimpleCNN_CIFAR(nn.Module):
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.5)
 
-        #  Полносвязные слои адаптированы под размер 8x8x128
+        # Полносвязные слои, подогнанные под форму 8x8x128
         # 8x8x128 -> 256 (меньше нейронов)
         self.fc1 = nn.Linear(128 * 8 * 8, 256)
         self.fc2 = nn.Linear(256, 64)           # 256 -> 64
-        self.fc3 = nn.Linear(64, num_classes)   # 64 -> 10 (количество классов)
+        self.fc3 = nn.Linear(64, num_classes)   # 64 -> 10 (число классов)
 
     def forward(self, x):
-        # Сверточные слои с активацией и пулингом
+        # Свёрточные слои с активацией и пулингом
         x = self.pool(self.relu(self.conv1(x)))  # 28x28x32 -> 14x14x32
         x = self.pool(self.relu(self.conv2(x)))  # 14x14x64 -> 7x7x64
         x = self.relu(self.conv3(x))             # 7x7x128 (БЕЗ пулинга)
 
-        # Преобразование в одномерный вектор
+        # Разворачиваем в одномерный вектор
         x = x.view(x.size(0), -1)  # Flatten: batch_size x (7*7*128)
 
         # Полносвязные слои
@@ -250,47 +249,47 @@ class SimpleCNN_CIFAR(nn.Module):
 #         return x
 
 
-# class SimpleCNN(nn.Module):
-#     """
-#     Простая сверточная нейронная сеть для классификации изображений CIFAR-10
-#     """
+class SimpleCNN(nn.Module):
+    """
+    Простая свёрточная нейронная сеть для классификации изображений CIFAR-10
+    """
 
-#     def __init__(self, num_classes=10):
-#         super(SimpleCNN, self).__init__()
-#         # 1) входных каналов = 1
-#         self.conv1 = nn.Conv2d(1, 32, 3, padding=1)     # 28x28 -> 28x28
-#         self.conv2 = nn.Conv2d(32, 64, 3, padding=1)    # 14x14 -> 14x14
-#         self.conv3 = nn.Conv2d(64, 128, 3, padding=1)   # 7x7   -> 7x7
-#         # 3x3   -> 3x3 (после 3 пулов)
-#         self.conv4 = nn.Conv2d(128, 256, 3, padding=1)
+    def __init__(self, num_classes=10):
+        super(SimpleCNN, self).__init__()
+        # 1) число входных каналов = 1
+        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)     # 28x28 -> 28x28
+        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)    # 14x14 -> 14x14
+        self.conv3 = nn.Conv2d(64, 128, 3, padding=1)   # 7x7   -> 7x7
+        # 3x3   -> 3x3 (после 3 пулингов)
+        self.conv4 = nn.Conv2d(128, 256, 3, padding=1)
 
-#         self.pool = nn.MaxPool2d(2, 2)
-#         self.relu = nn.ReLU()
-#         self.dropout = nn.Dropout(0.5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.5)
 
-#         # 2) размер после трех пулов на 28x28 = 3x3
-#         self.fc1 = nn.Linear(256 * 3 * 3, 512)
-#         self.fc2 = nn.Linear(512, 128)
-#         self.fc3 = nn.Linear(128, num_classes)
+        # 2) размер после трёх пулингов для 28x28 равен 3x3
+        self.fc1 = nn.Linear(256 * 3 * 3, 512)
+        self.fc2 = nn.Linear(512, 128)
+        self.fc3 = nn.Linear(128, num_classes)
 
-#     def forward(self, x):
-#         # Сверточные слои с активацией и пулингом
-#         x = self.pool(self.relu(self.conv1(x)))  # 32x32x32 -> 16x16x32
-#         x = self.pool(self.relu(self.conv2(x)))  # 16x16x64 -> 8x8x64
-#         x = self.pool(self.relu(self.conv3(x)))  # 8x8x128 -> 4x4x128
-#         x = self.relu(self.conv4(x))             # 4x4x256
+    def forward(self, x):
+        # Свёрточные слои с активацией и пулингом
+        x = self.pool(self.relu(self.conv1(x)))  # 32x32x32 -> 16x16x32
+        x = self.pool(self.relu(self.conv2(x)))  # 16x16x64 -> 8x8x64
+        x = self.pool(self.relu(self.conv3(x)))  # 8x8x128 -> 4x4x128
+        x = self.relu(self.conv4(x))             # 4x4x256
 
-#         # Преобразование в одномерный вектор
-#         x = x.view(x.size(0), -1)  # Flatten: batch_size x (4*4*256)
+        # Разворачиваем в одномерный вектор
+        x = x.view(x.size(0), -1)  # Flatten: batch_size x (4*4*256)
 
-#         # Полносвязные слои
-#         x = self.relu(self.fc1(x))
-#         x = self.dropout(x)
-#         x = self.relu(self.fc2(x))
-#         x = self.dropout(x)
-#         x = self.fc3(x)  # Выходной слой (логиты)
+        # Полносвязные слои
+        x = self.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = self.fc3(x)  # Выходной слой (логиты)
 
-#         return x
+        return x
 
 # ============================================================================
 # 3. ФУНКЦИИ ОБУЧЕНИЯ И ОЦЕНКИ
@@ -299,7 +298,7 @@ class SimpleCNN_CIFAR(nn.Module):
 
 def validate_model(model, val_loader, criterion, device):
     """
-    Валидация модели (оценка на валидационном наборе)
+    Валидация модели (оценка на валидационной выборке)
     """
     model.eval()
     val_loss = 0.0
@@ -334,9 +333,9 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
     val_losses = []
     val_accuracies = []
 
-    # Для раннего останова (early stopping)
+    # Для ранней остановки (early stopping)
     best_val_accuracy = 0.0
-    patience = 3  # Количество эпох без улучшения
+    patience = 3  # Число эпох без улучшения
     epochs_without_improvement = 0
 
     for epoch in range(num_epochs):
@@ -349,17 +348,17 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         total = 0
 
         for i, (inputs, labels) in enumerate(train_loader):
-            # Перемещение данных на устройство
+            # Переносим данные на устройство
             inputs, labels = inputs.to(device), labels.to(device)
 
-            # Обнуление градиентов
+            # Обнуляем градиенты
             optimizer.zero_grad()
 
-            # Прямой проход
+            # Прямой проход (forward pass)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
-            # Обратный проход и оптимизация
+            # Обратный проход и шаг оптимизации
             loss.backward()
             optimizer.step()
 
@@ -369,7 +368,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-        # Метрики обучения за эпоху
+        # Метрики обучения за эту эпоху
         train_loss = running_loss / len(train_loader)
         train_accuracy = 100 * correct / total
         train_losses.append(train_loss)
@@ -383,25 +382,26 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, device, n
         val_losses.append(val_loss)
         val_accuracies.append(val_accuracy)
 
-        # Печать метрик эпохи
-        print(f'Эпоха [{epoch+1}/{num_epochs}]:')
+        # Выводим метрики эпохи
+        print(f'Epoch [{epoch+1}/{num_epochs}]:')
         print(
-            f'  Обучение  - Потеря: {train_loss:.4f}, Точность: {train_accuracy:.2f}%')
+            f'  Training   - Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%')
         print(
-            f'  Валидация - Потеря: {val_loss:.4f}, Точность: {val_accuracy:.2f}%')
+            f'  Validation - Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.2f}%')
         print('-' * 60)
 
-        # Проверка на улучшение (для early stopping)
+        # Проверяем наличие улучшения (для ранней остановки)
         if val_accuracy > best_val_accuracy:
             best_val_accuracy = val_accuracy
             epochs_without_improvement = 0
-            # Здесь можно сохранить лучшую модель
+            # Здесь можно было бы сохранять лучшую модель
             print(
-                f'  ✅ Новая лучшая валидационная точность: {best_val_accuracy:.2f}%')
+                f'  ✅ New best validation accuracy: {best_val_accuracy:.2f}%')
         else:
             epochs_without_improvement += 1
             if epochs_without_improvement >= patience:
-                print(f'  ⏹️ Ранний останов: {patience} эпох без улучшения')
+                print(
+                    f'  ⏹️ Early stopping: {patience} epochs without improvement')
                 break
 
         print()
@@ -431,22 +431,22 @@ def evaluate_model_with_metrics(model, test_loader, device, classes):
         for inputs, labels in test_loader:
             inputs, labels = inputs.to(device), labels.to(device)
 
-            # Получение логитов (сырых выходов)
+            # Получаем логиты (сырые выходы)
             logits = model(inputs)
 
-            # Применение softmax для получения вероятностей
+            # Применяем softmax, чтобы получить вероятности
             softmax_probs = torch.softmax(logits, dim=1)
 
-            # Получение предсказаний
+            # Получаем предсказания
             _, predicted = torch.max(logits, 1)
 
-            # Сохранение результатов
+            # Сохраняем результаты
             all_predictions.extend(predicted.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
             all_softmax_probs.extend(softmax_probs.cpu().numpy())
             all_logits.extend(logits.cpu().numpy())
 
-    # Преобразование в numpy массивы для удобства
+    # Переводим в numpy-массивы для удобства
     all_predictions = np.array(all_predictions)
     all_labels = np.array(all_labels)
     all_softmax_probs = np.array(all_softmax_probs)
@@ -455,13 +455,13 @@ def evaluate_model_with_metrics(model, test_loader, device, classes):
     return all_predictions, all_labels, all_softmax_probs, all_logits
 
 # ============================================================================
-# 4. ФУНКЦИИ ДЛЯ ВЫЧИСЛЕНИЯ МЕТРИК
+# 4. ФУНКЦИИ ВЫЧИСЛЕНИЯ МЕТРИК
 # ============================================================================
 
 
 def calculate_confidence_scores(softmax_probs):
     """
-    Вычисление confidence scores как максимальной вероятности
+    Вычисляет оценки уверенности как максимальную вероятность
     """
     confidence_scores = np.max(softmax_probs, axis=1)
     return confidence_scores
@@ -469,7 +469,7 @@ def calculate_confidence_scores(softmax_probs):
 
 def calculate_top_k_accuracy(softmax_probs, true_labels, k=5):
     """
-    Вычисление Top-K accuracy
+    Вычисляет Top-K accuracy
     """
     acc = top_k_accuracy_score(true_labels, softmax_probs, k=k)
     return acc * 100.0
@@ -477,23 +477,23 @@ def calculate_top_k_accuracy(softmax_probs, true_labels, k=5):
 
 def calculate_entropy(softmax_probs):
     """
-    Вычисление энтропии для измерения неопределенности
-    H = -∑ p_i * log(p_i)
+    Вычисляет энтропию как меру неопределённости.
+    H = -sum(p_i * log(p_i))
     """
-    # Добавление малого значения для избежания log(0)
+    # Добавляем небольшое значение, чтобы избежать log(0)
     ent = scipy_entropy(softmax_probs, axis=1)
     return ent
 
 
 def calculate_calibration_error(softmax_probs, predictions, true_labels, n_bins=10):
     """
-    Вычисление Expected Calibration Error (ECE)
-    Измеряет соответствие между уверенностью модели и реальной точностью
+    Вычисляет ожидаемую ошибку калибровки (Expected Calibration Error, ECE).
+    Показывает, насколько уверенность модели соответствует её реальной точности.
     """
-    probs_t = torch.from_numpy(softmax_probs).float()      # shape: [N, C]
-    targets_t = torch.from_numpy(true_labels).long()       # shape: [N]
+    probs_t = torch.from_numpy(softmax_probs).float()      # форма: [N, C]
+    targets_t = torch.from_numpy(true_labels).long()       # форма: [N]
 
-    # ECE с L1-нормой (|conf - acc|), как у тебя было
+    # ECE с нормой L1 (|conf - acc|), как и раньше
     ece_metric = MulticlassCalibrationError(
         num_classes=softmax_probs.shape[1],
         n_bins=n_bins,
@@ -501,7 +501,7 @@ def calculate_calibration_error(softmax_probs, predictions, true_labels, n_bins=
     )
     ece = float(ece_metric(probs_t, targets_t).item())
 
-    # bin_data не нужен — возвращаем пустой список, чтобы не менять сигнатуры
+    # bin_data не нужен — возвращаем пустой список, чтобы сохранить сигнатуру
     return ece, []
 
 # ============================================================================
@@ -511,7 +511,7 @@ def calculate_calibration_error(softmax_probs, predictions, true_labels, n_bins=
 
 def plot_training_history(training_history):
     """
-    Построение графиков обучения и валидации (с лентами диапазона)
+    Строит кривые обучения и валидации (с полосами разброса)
     """
     import numpy as np
     import matplotlib.pyplot as plt
@@ -561,33 +561,33 @@ def plot_training_history(training_history):
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=FIGSIZE)
 
-    # --- Точность
+    # --- Accuracy (точность)
     tr_s = _smooth(train_accuracies, k=3)
     va_s = _smooth(val_accuracies,   k=3)
-    ax1.plot(epochs, tr_s, linewidth=LINEWIDTH, label='Обучение')
-    ax1.plot(epochs, va_s, linewidth=LINEWIDTH, label='Валидация')
+    ax1.plot(epochs, tr_s, linewidth=LINEWIDTH, label='Training')
+    ax1.plot(epochs, va_s, linewidth=LINEWIDTH, label='Validation')
     tr_lo, tr_hi = _roll_minmax(train_accuracies, k=5)
     va_lo, va_hi = _roll_minmax(val_accuracies,   k=5)
     ax1.fill_between(epochs, tr_lo, tr_hi, alpha=BAND_ALPHA)
     ax1.fill_between(epochs, va_lo, va_hi, alpha=BAND_ALPHA)
-    ax1.set_title('Точность по эпохам')
-    ax1.set_xlabel('Эпоха')
-    ax1.set_ylabel('Точность (%)')
+    ax1.set_title('Accuracy per epoch')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Accuracy (%)')
     ax1.grid(True, alpha=GRID_ALPHA)
     ax1.legend(loc='lower right')
 
-    # --- Потери
+    # --- Loss (функция потерь)
     tl_s = _smooth(train_losses, k=3)
     vl_s = _smooth(val_losses,   k=3)
-    ax2.plot(epochs, tl_s, linewidth=LINEWIDTH, label='Обучение')
-    ax2.plot(epochs, vl_s, linewidth=LINEWIDTH, label='Валидация')
+    ax2.plot(epochs, tl_s, linewidth=LINEWIDTH, label='Training')
+    ax2.plot(epochs, vl_s, linewidth=LINEWIDTH, label='Validation')
     tl_lo, tl_hi = _roll_minmax(train_losses, k=5)
     vl_lo, vl_hi = _roll_minmax(val_losses,   k=5)
     ax2.fill_between(epochs, tl_lo, tl_hi, alpha=BAND_ALPHA)
     ax2.fill_between(epochs, vl_lo, vl_hi, alpha=BAND_ALPHA)
-    ax2.set_title('Потери по эпохам')
-    ax2.set_xlabel('Эпоха')
-    ax2.set_ylabel('Потеря')
+    ax2.set_title('Loss per epoch')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Loss')
     ax2.grid(True, alpha=GRID_ALPHA)
     ax2.legend(loc='upper right')
 
@@ -595,27 +595,27 @@ def plot_training_history(training_history):
     plt.show()
 
     # --- Анализ переобучения (без изменений)
-    print("\n🔍 АНАЛИЗ ПЕРЕОБУЧЕНИЯ:")
+    print("\n🔍 OVERFITTING ANALYSIS:")
     final_train_acc = float(train_accuracies[-1])
     final_val_acc = float(val_accuracies[-1])
     gap = final_train_acc - final_val_acc
-    print(f"Финальная точность обучения: {final_train_acc:.2f}%")
-    print(f"Финальная точность валидации: {final_val_acc:.2f}%")
-    print(f"Разрыв (Train - Val): {gap:.2f}%")
+    print(f"Final training accuracy: {final_train_acc:.2f}%")
+    print(f"Final validation accuracy: {final_val_acc:.2f}%")
+    print(f"Gap (Train - Val): {gap:.2f}%")
     if gap < 3:
-        print("✅ Переобучения практически нет")
+        print("✅ Virtually no overfitting")
     elif gap < 8:
-        print("⚠️ Легкое переобучение")
+        print("⚠️ Mild overfitting")
     elif gap < 15:
-        print("🔶 Умеренное переобучение")
+        print("🔶 Moderate overfitting")
     else:
-        print("❌ Сильное переобучение")
+        print("❌ Strong overfitting")
     return gap
 
 
 def plot_confusion_matrix(true_labels, predictions, classes):
     """
-    Построение матрицы ошибок (проценты + абсолюты, нормировка по истине)
+    Строит матрицу ошибок (проценты + абсолютные значения, нормировка по истинному классу)
     """
     import numpy as np
     import matplotlib.pyplot as plt
@@ -633,161 +633,16 @@ def plot_confusion_matrix(true_labels, predictions, classes):
     plt.figure(figsize=FIGSIZE)
     ax = sns.heatmap(cm, annot=False, cmap='Blues',
                      xticklabels=classes, yticklabels=classes,
-                     vmin=0.0, vmax=1.0, cbar_kws={"label": "Доля по истинному классу"})
+                     vmin=0.0, vmax=1.0, cbar_kws={"label": "Share per true class"})
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
             txt = f"{cm[i, j]*100:.1f}%\n({cm_abs[i, j]})"
             ax.text(j+0.5, i+0.5, txt, ha='center',
                     va='center', fontsize=9, color='black')
 
-    plt.title('Матрица путаницы (ошибок)')
-    plt.xlabel('Предсказанный класс')
-    plt.ylabel('Истинный класс')
+    plt.title('Confusion matrix')
+    plt.xlabel('Predicted class')
+    plt.ylabel('True class')
     plt.grid(False)  # у heatmap своя сетка
     plt.tight_layout()
     plt.show()
-
-
-# ============================================================================
-# 6. ГЛАВНАЯ ФУНКЦИЯ - ПОЛНЫЙ ПАЙПЛАЙН
-# ============================================================================
-
-
-def main():
-    """
-    Основная функция, демонстрирующая полный пайплайн обучения и оценки
-    """
-    print("=" * 80)
-    print("ПРАКТИКА: КЛАССИФИКАЦИЯ И МЕТРИКИ ГЛУБОКОГО ОБУЧЕНИЯ")
-    print("=" * 80)
-
-    # 1. Загрузка данных
-    print("\n1. Загрузка данных CIFAR-10...")
-    train_loader, val_loader, test_loader, classes = load_cifar10_data(
-        batch_size=128, val_split=0.1)
-    print(f"Классы: {classes}")
-
-    # 2. Создание модели
-    print("\n2. Создание модели...")
-    model = SimpleCNN_CIFAR(num_classes=10).to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    # Подсчет параметров
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"Всего параметров в модели: {total_params:,}")
-
-    # 3. Обучение модели
-    print("\n3. Обучение модели с валидацией...")
-    print("=" * 60)
-    training_history = train_model(
-        model, train_loader, val_loader, criterion, optimizer, device, num_epochs=10
-    )
-
-    print(f"\n🎯 ИТОГИ ОБУЧЕНИЯ:")
-    print(
-        f"Лучшая валидационная точность: {training_history['best_val_accuracy']:.2f}%")
-
-    # 4. Финальная оценка на тестовом наборе
-    print("\n4. Финальная оценка на тестовом наборе...")
-    print("⚠️  ВАЖНО: Тестовый набор используется ТОЛЬКО для финальной оценки!")
-    print("🔒 Этот набор НЕ использовался во время обучения и валидации")
-    predictions, true_labels, softmax_probs, logits = evaluate_model_with_metrics(
-        model, test_loader, device, classes
-    )
-
-    # Базовая точность на тестовом наборе
-    test_accuracy = accuracy_score(true_labels, predictions) * 100
-    val_accuracy = training_history['best_val_accuracy']
-
-    print(f"\n📊 СРАВНЕНИЕ ВАЛИДАЦИИ И ТЕСТИРОВАНИЯ:")
-    print(f"Лучшая валидационная точность: {val_accuracy:.2f}%")
-    print(f"Финальная тестовая точность:   {test_accuracy:.2f}%")
-
-    accuracy_diff = abs(val_accuracy - test_accuracy)
-    if accuracy_diff < 2:
-        print(f"✅ Отличное соответствие (разница: {accuracy_diff:.2f}%)")
-    elif accuracy_diff < 5:
-        print(f"✅ Хорошее соответствие (разница: {accuracy_diff:.2f}%)")
-    elif accuracy_diff < 10:
-        print(f"⚠️  Умеренное расхождение (разница: {accuracy_diff:.2f}%)")
-    else:
-        print(f"❌ Значительное расхождение (разница: {accuracy_diff:.2f}%)")
-        print("   Возможные причины: переобучение на валидации, различия в данных")
-
-    # ========================================================================
-    # 5. ВЫЧИСЛЕНИЕ И АНАЛИЗ МЕТРИК
-    # ========================================================================
-
-    print("\n" + "=" * 50)
-    print("ФИНАЛЬНЫЕ МЕТРИКИ НА ТЕСТОВОМ НАБОРЕ")
-    print("=" * 50)
-    print("🔬 Все нижеприведенные метрики вычислены на независимом тест сете")
-
-    # 5.1 Базовая точность (Top-1 Accuracy)
-    basic_accuracy = accuracy_score(true_labels, predictions) * 100
-    print(f"\n📊 БАЗОВЫЕ МЕТРИКИ:")
-    print(f"Top-1 Accuracy: {basic_accuracy:.2f}%")
-
-    # 5.2 Confidence Scores
-    confidence_scores = calculate_confidence_scores(softmax_probs)
-    avg_confidence = np.mean(confidence_scores)
-    print(f"Средний Confidence Score: {avg_confidence:.3f}")
-    print(f"Мин. Confidence Score: {np.min(confidence_scores):.3f}")
-    print(f"Макс. Confidence Score: {np.max(confidence_scores):.3f}")
-
-    # 5.3 Top-K Accuracy
-    print(f"\n🎯 TOP-K ACCURACY:")
-    for k in [1, 3, 5]:
-        top_k_acc = calculate_top_k_accuracy(softmax_probs, true_labels, k=k)
-        print(f"Top-{k} Accuracy: {top_k_acc:.2f}%")
-
-    # 5.4 Энтропия
-    entropy_values = calculate_entropy(softmax_probs)
-    avg_entropy = np.mean(entropy_values)
-    print(f"\n🔀 ЭНТРОПИЯ (неопределенность):")
-    print(f"Средняя энтропия: {avg_entropy:.3f}")
-    print(f"Мин. энтропия: {np.min(entropy_values):.3f}")
-    print(f"Макс. энтропия: {np.max(entropy_values):.3f}")
-    print(f"Стандартное отклонение: {np.std(entropy_values):.3f}")
-
-    # 5.5 Калибровка
-    ece, bin_data = calculate_calibration_error(
-        softmax_probs, predictions, true_labels)
-    print(f"\n⚖️ КАЛИБРОВКА:")
-    print(
-        f"Expected Calibration Error (ECE) Разница между заявленной уверенностью и реальной точностью всего: {ece:.3f}")
-    print(f"Как интерпритировать: если модель говорит «я уверена на 80%», то она примерно в 76–80% случаев права (почти идеально).")
-    print("Интерпретация ECE:")
-    print("  - 0.0-0.05: Отлично откалибрована")
-    print("  - 0.05-0.1: Хорошо откалибрована")
-    print("  - 0.1-0.2: Умеренно откалибрована")
-    print("  - >0.2: Плохо откалибрована")
-
-    # 5.6 Анализ по классам
-    print(f"\n📋 ДЕТАЛЬНЫЙ ОТЧЕТ ПО КЛАССАМ:")
-    class_report = classification_report(true_labels, predictions,
-                                         target_names=classes, digits=3)
-    print(class_report)
-
-    # ========================================================================
-    # 6. ВИЗУАЛИЗАЦИЯ РЕЗУЛЬТАТОВ
-    # ========================================================================
-
-    print("\n" + "=" * 50)
-    print("ВИЗУАЛИЗАЦИЯ РЕЗУЛЬТАТОВ")
-    print("=" * 50)
-
-    # График обучения с валидацией
-    overfitting_gap = plot_training_history(training_history)
-
-    # Матрица ошибок
-    plot_confusion_matrix(true_labels, predictions, classes)
-
-# ============================================================================
-# 8. ЗАПУСК ПРОГРАММЫ
-# ============================================================================
-
-
-if __name__ == "__main__":
-    main()

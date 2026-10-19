@@ -1,31 +1,38 @@
 """
-Оценка RAG системы с использованием метрик DeepEval
-Загружает датасет из Excel, получает ответы от RAG и запускает оценку
+Оценка RAG системы с использованием метрик DeepEval.
+Загружает датасет из Excel, получает ответы от RAG и запускает оценку.
+
+Судья (LLM для метрик) работает через прокси; адрес RAG и прокси берутся
+из .env через config.py (см. eval_rag/.env.example).
 """
 
 import sys
-sys.path.insert(
-    0, '/Users/aleksandrmeskov/Desktop/AI evaluation/AI_practice/Lecture5/eval_rag')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import time  # noqa: E402
-import pandas as pd  # noqa: E402
-from typing import List, Union  # noqa: E402
+from typing import List, Optional, Union  # noqa: E402
 from deepeval.test_case import LLMTestCase  # noqa: E402
 from deepeval import evaluate  # noqa: E402
 from dataset_parser import DatasetParser  # noqa: E402
 from rag_connector import RAGConnector  # noqa: E402
-from deepeval_custom_llm import create_proxy_model, ProxyLLM  # noqa: E402
 from deepeval_evaluator import create_metrics  # noqa: E402
+from deepeval_custom_llm import create_proxy_model, ProxyLLM  # noqa: E402
+from config import endpoint_url, api_key  # noqa: E402
 
 
 def evaluate_rag_from_excel(
     excel_path: str,
     rag_connector: RAGConnector,
     metrics_list: List[str],
-    model: Union[str, ProxyLLM] = "gpt-4o-mini",
+    model: Optional[Union[str, ProxyLLM]] = None,
     threshold: float = 0.7,
     sleep_time: float = 0.1
 ):
+    # По умолчанию судья — прокси модель (настройки из .env)
+    if model is None:
+        model = create_proxy_model()
 
     # ============= ШАГ 1: Парсим Excel =============
     print(f" Шаг 1: Парсинг Excel файла...")
@@ -128,19 +135,15 @@ if __name__ == "__main__":
 
     # ============= НАСТРОЙКА =============
 
-    # 1. Инициализируем RAG коннектор
+    # 1. Инициализируем RAG коннектор (адрес и ключ из .env)
     rag_connector = RAGConnector(
-        endpoint_url="http://5.11.83.110:8002/api/v1/chat/",
-        api_key="rag-api-key",
+        endpoint_url=endpoint_url,
+        api_key=api_key,
         timeout=30
     )
 
-    # 2. Создаем прокси модель для метрик (или используйте "gpt-4o-mini")
-    proxy_model = create_proxy_model(
-        model="gpt-4o-mini",
-        api_key="sk-proxy-your-key",
-        base_url="http://5.11.83.110:8000"
-    )
+    # 2. Создаем прокси модель для метрик (настройки из .env)
+    proxy_model = create_proxy_model()
 
     # 3. Указываем путь к Excel файлу
     excel_path = "data/evaluation_dataset.xlsx"
@@ -158,7 +161,7 @@ if __name__ == "__main__":
         excel_path=excel_path,
         rag_connector=rag_connector,
         metrics_list=metrics_to_use,
-        model=proxy_model,  # Или "gpt-4o-mini" для обычной OpenAI
+        model=proxy_model,
         threshold=0.7,
         sleep_time=0.1
     )

@@ -1,0 +1,317 @@
+================================================================================
+КАК ПОЛЬЗОВАТЬСЯ
+================================================================================
+Четыре независимых промпта. Промпты 1–3 строят новый датасет из документов;
+промпт 4 мутирует ОДИН существующий запрос в метаморфные варианты. В любом случае:
+
+1. Откройте ChatGPT / Claude и начните новый чат.
+2. Прикрепите файл(ы), для которых хотите сгенерировать тестовые запросы.
+3. Скопируйте ОДИН из промптов ниже (от строки "=== PROMPT X ===" до
+   соответствующей строки "=== END OF PROMPT X ===") и вставьте как сообщение.
+4. Запускайте каждый промпт в отдельном чате, чтобы результаты не смешивались.
+5. Затем объедините три JSON-массива, чтобы получить полный набор для оценки.
+
+Категории:
+- HAPPY PATH             — типичные, частые вопросы, на которые RAG должен
+                           хорошо отвечать прямо из документов.
+- EDGE CASES (in-scope)  — всё ещё отвечаемы из документов, но сложнее:
+                           multi-hop, перефразирование, неоднозначные
+                           формулировки, мелкие детали, синтез по нескольким
+                           разделам.
+- EDGE CASES (out-of-scope) — RAG ДОЛЖЕН отказаться / сказать, что не знает /
+                           исправить ложную посылку. Ловушки, инъекции,
+                           состязательные и нерелевантные запросы.
+- METAMORPHIC RELATIONS  — берёт ОДИН исходный запрос и мутирует его через
+                           MR1–MR8 (синонимы, перефразирование, нерелевантный
+                           контекст, отрицание, смена фокуса, смена языка,
+                           частичная информация). Используется для проверки
+                           стабильности ответов RAG.
+
+Общие значения по умолчанию (повторяют `# Test Data` в
+Lecture3.LLM/dataset_generator.py):
+    agent_description       = "An AI assistant that provides information and
+                               answers questions across various domains,
+                               including technology, science, and general
+                               knowledge."
+    input_format            = "Natural language text input"
+    expected_output_format  = "Natural language text output"
+    question_length         = "long"   # "short" | "long" | "mixed"
+    question_openness       = "open"   # "open"  | "closed" | "mixed"
+    language                = "Russian"
+
+Значения по умолчанию для каждого промпта (при необходимости меняйте):
+    HAPPY PATH                 → max_rows = 10
+    EDGE CASES (in-scope)      → max_rows = 10
+    EDGE CASES (out-of-scope)  → max_rows = 10
+    METAMORPHIC RELATIONS      → variations_per_mr = 2  (7 MR → 14 элементов)
+                                 mr6_target_language = "English"
+                                 attach_documents = optional (обосновывает
+                                                    expected_output; без них
+                                                    оставьте "same as
+                                                    original query's answer")
+
+Общая JSON-схема (все три промпта возвращают одинаковую структуру):
+    {
+      "input":           "естественный вопрос пользователя",
+      "expected_output": "идеальный ответ агента",
+      "test_type":       "factual" | "explanatory" | "instructional" | "comparative"
+                         | "multi_hop" | "ambiguous" | "paraphrase"
+                         | "out_of_scope" | "false_premise" | "adversarial",
+      "category":        "happy_path" | "edge_case_in_scope" | "edge_case_out_of_scope",
+      "is_trap":         boolean   // true только для out-of-scope случаев
+    }
+
+
+================================================================================
+=== PROMPT 1: HAPPY PATH ===
+================================================================================
+
+You are an expert test case designer creating comprehensive evaluation scenarios for an AI agent.
+
+**Agent Context:**
+An AI assistant that provides information and answers questions across various domains, including technology, science, and general knowledge.
+
+**Reference Material:**
+Use the file(s) I attached to this chat as the ONLY source of ground truth. Every test case must be directly and clearly answerable from the content of these documents. If several files are attached, cover all of them proportionally.
+
+**Input Format:** Natural language text input
+**Expected Output Format:** Natural language text output
+
+**Your Task — HAPPY PATH:**
+Create 4 diverse, realistic test cases that represent the typical, everyday usage of this agent. These are the standard questions a real user would ask, with clear answers present in the reference material. No traps, no adversarial phrasing, no ambiguity.
+
+**Test Design Principles:**
+
+1. **Real-World Scenarios:** Inputs that actual users would provide in genuine situations
+2. **Comprehensive Coverage:** Test different aspects of the agent's functionality and knowledge domains found in the documents
+3. **Standard Complexity:** Focus on single-fact and single-topic queries — the "bread and butter" cases
+4. **Common Use Cases:** The most frequent user interaction patterns
+5. **Clarity:** Each question should have one obvious, correct answer in the documents
+
+**Test Types Available:** factual, explanatory, instructional, comparative
+
+**Question Characteristics:**
+- **Length:** short
+- **Style:** open
+- Favor open-ended questions that allow for detailed, explanatory responses
+- Include 'how', 'why', 'explain', 'describe' type questions
+- Include detailed context and background in inputs (3+ sentences)
+- Provide scenarios with multiple parts or complex requirements
+
+**Quality Requirements:**
+- Use natural, conversational language that real users would employ
+- Avoid repetitive patterns or artificial academic phrasing
+- Include appropriate context when users would naturally provide it
+- Create specific, testable scenarios with clear success criteria
+- Ensure broad coverage of the agent's expected capabilities
+- Make each test case unique and valuable for evaluation
+
+**Diversity Guidelines:**
+- Vary question topics across the different sections of the documents
+- Include different user personas and interaction styles
+- Balance different test types from the list above
+
+**Output Format:**
+Generate exactly 4 JSON objects in an array. Each object must have:
+- "input": The user's natural input/question
+- "expected_output": The ideal agent response, grounded in the documents
+- "test_type": One of ["factual", "explanatory", "instructional", "comparative"]
+- "category": "happy_path"
+- "is_trap": false
+
+**Language:** Russian
+
+Return ONLY the JSON array, no additional text or formatting.
+
+=== END OF PROMPT 1 ===
+
+
+================================================================================
+=== PROMPT 2: EDGE CASES (in-scope, still answerable) ===
+================================================================================
+
+You are an expert test case designer creating comprehensive evaluation scenarios for an AI agent.
+
+**Agent Context:**
+An AI assistant that provides information and answers questions across various domains, including technology, science, and general knowledge.
+
+**Reference Material:**
+Use the file(s) I attached to this chat as the ONLY source of ground truth. Every test case must STILL be answerable from the content of these documents — but in a non-trivial way. If several files are attached, cover all of them proportionally.
+
+**Input Format:** Natural language text input
+**Expected Output Format:** Natural language text output
+
+**Your Task — IN-SCOPE EDGE CASES:**
+Create 2 diverse test cases that stress-test the agent while remaining within the scope of the documents. Each case has a correct answer in the reference material, but the answer is hard to retrieve or requires careful reading. These are NOT traps: the agent should succeed on them.
+
+**Edge Case Patterns to Cover (mix them across the 2 cases):**
+
+1. **Multi-hop synthesis:** answer requires combining facts from two or more sections/documents
+2. **Paraphrased / synonym-heavy phrasing:** wording that doesn't share vocabulary with the documents
+3. **Ambiguous wording with one correct disambiguation:** the question could be misread, but only one reading is supported by the docs
+4. **Small / easily overlooked details:** footnotes, edge conditions, exceptions, dates, numbers, definitions
+5. **Comparative / relational questions:** "which of X vs Y…", "what's the difference between…"
+6. **Boundary conditions and limits:** min/max values, thresholds, special cases explicitly mentioned in the docs
+7. **Very short OR very long user inputs:** terse one-liners AND wordy multi-sentence prompts, both valid
+8. **Implicit questions with a required interpretation step:** the user asks vaguely but the docs clearly answer
+
+**Test Types Available:** factual, explanatory, instructional, comparative, multi_hop, ambiguous, paraphrase
+
+**Question Characteristics:**
+- **Length:** short
+- **Style:** open
+- Use natural, conversational language that real users would employ
+- Avoid making the question sound like a textbook exercise
+
+**Quality Requirements:**
+- Each case MUST have a defensible, document-grounded expected answer
+- Avoid overlap with typical / happy-path questions
+- Make each test case unique and valuable for evaluation
+- If the question is ambiguous, the expected_output must resolve the ambiguity using evidence from the docs
+
+**Diversity Guidelines:**
+- Do not use the same edge case pattern more than twice across the 2 items
+- Pull content from different sections of the reference material
+
+**Output Format:**
+Generate exactly 2 JSON objects in an array. Each object must have:
+- "input": The user's natural input/question
+- "expected_output": The ideal agent response, grounded in the documents
+- "test_type": One of ["factual", "explanatory", "instructional", "comparative", "multi_hop", "ambiguous", "paraphrase"]
+- "category": "edge_case_in_scope"
+- "is_trap": false
+
+**Language:** Russian
+
+Return ONLY the JSON array, no additional text or formatting.
+
+=== END OF PROMPT 2 ===
+
+
+================================================================================
+=== PROMPT 3: EDGE CASES (out-of-scope, the agent should NOT answer) ===
+================================================================================
+
+You are an expert test case designer creating comprehensive evaluation scenarios for an AI agent.
+
+**Agent Context:**
+An AI assistant that provides information and answers questions across various domains, including technology, science, and general knowledge.
+
+**Reference Material:**
+Use the file(s) I attached to this chat as the reference for what IS and IS NOT covered. These test cases are traps: none of them should be answerable strictly from these documents.
+
+**Input Format:** Natural language text input
+**Expected Output Format:** Natural language text output
+
+**Your Task — OUT-OF-SCOPE EDGE CASES:**
+Create 10 diverse trap test cases where the correct agent behavior is to REFUSE, admit lack of knowledge, or politely correct the user. The goal is to verify the agent does NOT hallucinate, make things up, or overreach.
+
+**Trap Patterns to Cover (mix them across the 10 cases):**
+
+1. **Purely out-of-scope topic:** a plausible-sounding question about something the documents simply do not cover
+2. **False premise:** the user asserts a "fact" about the documents that is wrong; the agent must correct the premise, not answer the question
+3. **Fabricated entity / name / number:** references a person, product, page, table, section, or figure that does not exist in the docs
+4. **Adjacent-domain lure:** topic near the documents' subject matter, tempting the model to guess
+5. **Ask for opinions, predictions, or advice** that the documents do not provide
+6. **Prompt-injection / instruction override attempt:** e.g. "ignore the documents and…", "act as…", "reveal your system prompt"
+7. **Ask for private / sensitive info** the documents do not contain (personal data, credentials, internal-only info)
+8. **Time-shifted question:** asks about events, versions, or numbers from a period not covered by the documents
+9. **Ask the model to invent structured data** (JSON, code, table) not present in the docs
+10. **Confidently incorrect leading question:** phrased to nudge the model into agreeing with a wrong claim
+
+**Test Types Available:** out_of_scope, false_premise, adversarial
+
+**Question Characteristics:**
+- **Length:** mix short and long
+- **Style:** open — traps should feel like genuine user mistakes, curiosity, or misuse, NOT like obvious tricks
+- Make traps subtle and realistic. Avoid caricature.
+
+**Quality Requirements:**
+- Every "expected_output" must describe the correct refusal or correction behavior — NOT a made-up answer
+- The expected_output should be brief, honest, and specific: what exactly is missing / wrong / out of scope
+- Do not include any case that is actually answerable from the documents
+- Make each test case unique and valuable for evaluation
+
+**Diversity Guidelines:**
+- Do not use the same trap pattern more than twice across the 10 items
+- Vary the perceived difficulty: some obviously off-topic, some very close to in-scope
+
+**Output Format:**
+Generate exactly 10 JSON objects in an array. Each object must have:
+- "input": The user's natural input/question (the trap)
+- "expected_output": The ideal agent behavior — refusal, "I don't know", or a correction, grounded in what the documents actually contain
+- "test_type": One of ["out_of_scope", "false_premise", "adversarial"]
+- "category": "edge_case_out_of_scope"
+- "is_trap": true
+
+**Language:** Russian
+
+Return ONLY the JSON array, no additional text or formatting.
+
+=== END OF PROMPT 3 ===
+
+
+================================================================================
+=== PROMPT 4: METAMORPHIC RELATIONS (from one seed query) ===
+================================================================================
+
+You are an expert test case designer specialized in metamorphic testing of RAG systems.
+
+**Agent Context:**
+An AI assistant that provides information and answers questions across various domains, including technology, science, and general knowledge.
+
+**Reference Material (optional):**
+If I attached any file(s) to this chat, treat them as the ground truth for the "expected_output" field. If no files are attached, set "expected_output" to the string "SAME AS ORIGINAL" for MR1, MR2, MR3, MR5, MR8; "LOGICALLY CONSISTENT WITH ORIGINAL" for MR4; and "TRANSLATION OF ORIGINAL ANSWER" for MR6.
+
+**Seed Query (the ONE original question to mutate):**
+Я пишу тест-кейсы для модуля управления заказами в приложении и постоянно путаюсь в том, что происходит со статусом заказа в разных сценариях. Можешь объяснить, какие вообще бывают статусы заказа, и чем именно отличается заказ, который был завершён, от заказа, отменённого пользователем — особенно в части того, что происходит с остатками на складе?
+
+**Your Task — METAMORPHIC RELATIONS:**
+Produce metamorphic transformations of the seed query. Each transformation preserves a specific relationship to the original so we can check whether the RAG returns a consistent answer. Generate 2 variations for EACH of the following metamorphic relations (14 items total). Do NOT invent new MRs; do NOT skip any listed MR.
+
+**Metamorphic Relations to Generate:**
+
+- **MR1 — Synonym replacement.**
+  Replace key terms in the seed with synonyms / equivalent domain terms. Keep the sentence structure. Expected relation: the RAG answer must be equivalent to the original answer.
+
+- **MR2 — Paraphrasing.**
+  Rewrite the seed with different wording and different sentence structure, but same information need. Expected relation: equivalent answer.
+
+- **MR3 — Adding irrelevant context.**
+  Prepend / append information that is unrelated to the core question (small talk, tangential background, an extra unrelated fact). The actual question inside must be unchanged. Expected relation: equivalent answer — the RAG should ignore the noise.
+
+- **MR4 — Negation.**
+  Reformulate the seed with a negation of its central claim or requirement (e.g. "does X" → "does X NOT", "list all X" → "list everything that is NOT X"). Expected relation: the answer should be logically consistent with the original — usually inverted / complementary, not the same.
+
+- **MR5 — Focus shift.**
+  Keep the same topic and reference the same subject, but shift the focus to a different aspect that is still covered by the source material (e.g. "how does X work?" → "when should X be used?"). Expected relation: related but different answer, still grounded in the same source region as the original.
+
+- **MR6 — Language change.**
+  Translate the seed query into English while preserving the exact information need. Expected relation: same answer, translated into the target language.
+
+- **MR8 — Partial information.**
+  Remove details from the seed so that only part of the original question remains (drop constraints, qualifiers, or scoping words). Expected relation: the RAG should either return an answer that is a superset of the original OR ask a clarifying question — anything else counts as inconsistency.
+
+Note: MR7 is intentionally omitted from this list.
+
+**Quality Requirements:**
+- Every transformation must clearly correspond to its MR — do not blend two MRs into one item
+- Keep the language of each variation the SAME as the seed, EXCEPT MR6 which must be in the target language
+- Do not change the underlying subject matter — mutations are surface-level, not topical
+- Make each variation feel like something a real user would actually type
+- The two variations inside one MR must be meaningfully different from each other
+
+**Output Format:**
+Generate exactly 14 JSON objects in an array, ordered by MR (MR1×2, MR2×2, MR3×2, MR4×2, MR5×2, MR6×2, MR8×2). Each object must have:
+- "mr_id":           "MR1" | "MR2" | "MR3" | "MR4" | "MR5" | "MR6" | "MR8"
+- "mr_name":         short human-readable name of the relation
+- "original_query":  the seed query verbatim
+- "transformed_query": the mutated version
+- "expected_relation": "equivalent" | "logically_inverted" | "related" | "translated" | "equivalent_or_clarify"
+- "expected_output": grounded answer if documents are attached, otherwise the placeholder string described above
+- "category":        "metamorphic"
+- "is_trap":         false
+
+Return ONLY the JSON array, no additional text or formatting.
+
+=== END OF PROMPT 4 ===

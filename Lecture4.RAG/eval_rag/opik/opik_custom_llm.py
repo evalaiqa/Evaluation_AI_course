@@ -1,13 +1,21 @@
 """
-Кастомная модель Opik для работы через прокси сервер
-Аналог DeepEval ProxyLLM, но для Opik
+Кастомная модель Opik для работы через прокси сервер.
+Аналог DeepEval ProxyLLM, но для Opik.
+
+Настройки прокси (PROXY_BASE_URL / PROXY_API_KEY / MODEL) берутся из .env
+через config.py (см. eval_rag/.env.example).
 """
 
-import os
-from typing import Optional, List, Dict, Any, Type
-import pydantic
-from openai import OpenAI
-from opik.evaluation.models.base_model import OpikBaseModel
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from typing import Optional, List, Dict, Any, Type  # noqa: E402
+import pydantic  # noqa: E402
+from openai import OpenAI  # noqa: E402
+from opik.evaluation.models.base_model import OpikBaseModel  # noqa: E402
+from config import proxy_base_url, proxy_api_key, model as default_model  # noqa: E402
 
 
 class OpikProxyLLM(OpikBaseModel):
@@ -18,7 +26,7 @@ class OpikProxyLLM(OpikBaseModel):
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = default_model,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         temperature: float = 0.1
@@ -28,22 +36,16 @@ class OpikProxyLLM(OpikBaseModel):
 
         Args:
             model: Название модели (gpt-4o-mini, gpt-3.5-turbo и т.д.)
-            api_key: API ключ прокси (по умолчанию из переменной окружения)
-            base_url: URL прокси сервера (по умолчанию из переменной окружения)
+            api_key: API ключ прокси (по умолчанию из .env)
+            base_url: URL прокси сервера (по умолчанию из .env)
             temperature: Температура генерации
         """
         super().__init__(model_name=model)
         self.temperature = temperature
 
-        # Получаем настройки из переменных окружения или используем переданные
-        self.api_key = api_key or os.getenv(
-            "PROXY_API_KEY",
-            "sk-proxy-your-key"
-        )
-        self.base_url = base_url or os.getenv(
-            "PROXY_BASE_URL",
-            "http://5.11.83.110:8000"
-        )
+        # Берём настройки из аргументов или из .env (через config.py)
+        self.api_key = api_key or proxy_api_key
+        self.base_url = base_url or proxy_base_url
 
         # Создаем клиент OpenAI с прокси настройками
         self.client = OpenAI(
@@ -90,7 +92,7 @@ class OpikProxyLLM(OpikBaseModel):
 
 
 def create_opik_proxy_model(
-    model: str = "gpt-4o-mini",
+    model: str = default_model,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     temperature: float = 0.1
@@ -115,29 +117,24 @@ def create_opik_proxy_model(
     )
 
 
-# # Тестирование модели при запуске файла напрямую
-# if __name__ == "__main__":
-#     # Тест прокси модели
-#     print("🔄 Тестирование OpikProxyLLM...")
+# Тестирование модели при запуске файла напрямую
+if __name__ == "__main__":
+    print("🔄 Тестирование OpikProxyLLM...")
 
-#     # Создаем модель
-#     proxy_model = create_opik_proxy_model(
-#         model="gpt-4o-mini",
-#         api_key="sk-proxy-your-key",
-#         base_url="http://5.11.83.110:8000"
-#     )
+    # Создаем модель (настройки берутся из .env)
+    proxy_model = create_opik_proxy_model()
 
-#     # Тестовый промпт
-#     test_prompt = "Explain what is RAG in one sentence."
+    # Тестовый промпт
+    test_prompt = "Объясни одним предложением, что такое RAG."
 
-#     print(f"\n📝 Промпт: {test_prompt}")
-#     print(f"🤖 Модель: {proxy_model.model_name}")
-#     print(f"🌐 Прокси: {proxy_model.base_url}")
-#     print(f"🔑 API Key: {proxy_model.api_key[:20]}...")
+    print(f"\n📝 Промпт: {test_prompt}")
+    print(f"🤖 Модель: {proxy_model.model_name}")
+    print(f"🌐 Прокси: {proxy_model.base_url}")
+    print(f"🔑 API Key: {proxy_model.api_key[:20]}...")
 
-#     # Генерируем ответ
-#     try:
-#         response = proxy_model(test_prompt)
-#         print(f"\n✅ Ответ: {response}")
-#     except Exception as e:
-#         print(f"\n❌ Ошибка: {e}")
+    # Генерируем ответ
+    try:
+        response = proxy_model(test_prompt)
+        print(f"\n✅ Ответ: {response}")
+    except Exception as e:
+        print(f"\n❌ Ошибка: {e}")

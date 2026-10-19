@@ -6,3 +6,4 @@ __pycache__/
 .claude
 Lecture4.RAG/myenv
 Lecture4.RAG/.env.local
+Lecture4.RAG/eval_rag/.env

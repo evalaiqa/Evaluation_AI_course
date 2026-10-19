@@ -1,35 +1,39 @@
 """
-Оценка RAG системы с использованием Opik метрик
-Использует готовый датасет из Opik UI и запускает оценку
+Оценка RAG системы с использованием Opik метрик.
+Использует готовый датасет из Opik UI и запускает оценку.
+
+Судья (LLM для метрик) работает через прокси; адрес RAG и прокси берутся
+из .env через config.py (см. eval_rag/.env.example).
 """
 
 import sys
-sys.path.insert(
-    0, '/Users/aleksandrmeskov/Desktop/AI evaluation/AI_practice/Lecture5/eval_rag')
+from pathlib import Path
 
-import os  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import time  # noqa: E402
-from typing import List, Dict, Union  # noqa: E402
+from typing import List, Optional, Union  # noqa: E402
 import opik  # noqa: E402
 from opik.evaluation import evaluate  # noqa: E402
 from opik import Opik  # noqa: E402
-from opik_custom_llm import create_opik_proxy_model, OpikProxyLLM  # noqa: E402
 from opik_evaluator import create_metrics, simple_rag_task  # noqa: E402
+from opik_custom_llm import create_opik_proxy_model, OpikProxyLLM  # noqa: E402
 from rag_connector import RAGConnector  # noqa: E402
+from config import endpoint_url, api_key  # noqa: E402
 
 
 def evaluate_rag_with_opik(
     dataset_name: str,
     rag_connector: RAGConnector,
     metrics_list: List[str],
-    experiment_name: str = "RAG_Evaluation",
-    project_name: str = "default",
-    model: Union[str, OpikProxyLLM] = "gpt-4o-mini",
-    use_proxy: bool = True,
-    proxy_api_key: str = None,
-    proxy_base_url: str = None,
+    experiment_name: str = "v_1_RAG_Evaluation",
+    project_name: str = "Test evaluation",
+    model: Optional[Union[str, OpikProxyLLM]] = None,
     sleep_time: float = 0.1
 ):
+    # По умолчанию судья — прокси модель (настройки из .env)
+    if model is None:
+        model = create_opik_proxy_model()
 
     opik.configure(use_local=False)
     client = Opik()
@@ -80,17 +84,8 @@ def evaluate_rag_with_opik(
         print(f"❌ Ошибка создания датасета: {e}")
         return
 
-    if use_proxy:
-        model_for_metrics = create_opik_proxy_model(
-            model=model,
-            api_key=proxy_api_key or "sk-proxy-your-key",
-            base_url=proxy_base_url or "http://5.11.83.110:8000"
-        )
-    else:
-        model_for_metrics = model
-
     metrics = create_metrics(
-        model=model_for_metrics,
+        model=model,
         metrics_list=metrics_list
     )
 
@@ -109,14 +104,15 @@ def evaluate_rag_with_opik(
 
 if __name__ == "__main__":
 
+    # Инициализируем RAG коннектор (адрес и ключ из .env)
     rag_connector = RAGConnector(
-        endpoint_url="http://5.11.83.110:8002/api/v1/chat/",
-        api_key="sk-rag-your-key",
+        endpoint_url=endpoint_url,
+        api_key=api_key,
         timeout=30
     )
 
-    dataset_name = "simple_test_dataset_v3"
-    experiment_name = "RAG_Evaluation_From_Dataset_v6"
+    dataset_name = "simple_test_dataset_v4"
+    experiment_name = "RAG_Evaluation_From_Dataset_v7"
     project_name = "Test evaluation"
 
     metrics_to_use = [
@@ -124,9 +120,8 @@ if __name__ == "__main__":
         'hallucination'
     ]
 
-    use_proxy = True
-    proxy_api_key = "sk-proxy-your-key"
-    proxy_base_url = "http://5.11.83.110:8000"
+    # Судья — прокси модель (настройки из .env)
+    proxy_model = create_opik_proxy_model()
 
     evaluate_rag_with_opik(
         dataset_name=dataset_name,
@@ -134,8 +129,5 @@ if __name__ == "__main__":
         metrics_list=metrics_to_use,
         experiment_name=experiment_name,
         project_name=project_name,
-        model="gpt-4o-mini",
-        use_proxy=use_proxy,
-        proxy_api_key=proxy_api_key,
-        proxy_base_url=proxy_base_url
+        model=proxy_model
     )

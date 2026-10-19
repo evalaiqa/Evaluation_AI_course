@@ -1,16 +1,24 @@
 """
-RAGAS с поддержкой прокси через LangChain
+RAGAS с поддержкой прокси через LangChain.
+
+Настройки прокси (PROXY_BASE_URL / PROXY_API_KEY / MODEL) берутся из .env
+через config.py (см. eval_rag/.env.example).
 """
-from typing import List, Optional
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from ragas.llms import LangchainLLMWrapper
-from ragas.embeddings import LangchainEmbeddingsWrapper
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings  # noqa: E402
+from ragas.llms import LangchainLLMWrapper  # noqa: E402
+from ragas.embeddings import LangchainEmbeddingsWrapper  # noqa: E402
+from config import proxy_base_url, proxy_api_key, model as default_model  # noqa: E402
 
 
 def create_proxy_llm(
-    model: str = "gpt-4o-mini",
-    api_key: str = "sk-proxy-your-key",
-    base_url: str = "http://5.11.83.110:8000",
+    model: str = default_model,
+    api_key: str = None,
+    base_url: str = None,
     temperature: float = 0.0
 ):
     """
@@ -18,8 +26,8 @@ def create_proxy_llm(
 
     Args:
         model: Название модели
-        api_key: API ключ прокси
-        base_url: URL прокси сервера
+        api_key: API ключ прокси (по умолчанию из .env)
+        base_url: URL прокси сервера (по умолчанию из .env)
         temperature: Температура
 
     Returns:
@@ -28,8 +36,8 @@ def create_proxy_llm(
     # LangChain OpenAI с кастомным base_url
     llm = ChatOpenAI(
         model=model,
-        api_key=api_key,
-        base_url=base_url,  # ← Ваш прокси!
+        api_key=api_key or proxy_api_key,
+        base_url=base_url or proxy_base_url,  # ← Ваш прокси!
         temperature=temperature
     )
 
@@ -38,22 +46,22 @@ def create_proxy_llm(
 
 
 def create_proxy_embeddings(
-    api_key: str = "sk-proxy-your-key",
-    base_url: str = "http://5.11.83.110:8000"
+    api_key: str = None,
+    base_url: str = None
 ):
     """
     Создать Embeddings для RAGAS через прокси
 
     Args:
-        api_key: API ключ прокси
-        base_url: URL прокси сервера
+        api_key: API ключ прокси (по умолчанию из .env)
+        base_url: URL прокси сервера (по умолчанию из .env)
 
     Returns:
         LangchainEmbeddingsWrapper для RAGAS
     """
     embeddings = OpenAIEmbeddings(
-        api_key=api_key,
-        base_url=base_url  # ← Ваш прокси!
+        api_key=api_key or proxy_api_key,
+        base_url=base_url or proxy_base_url  # ← Ваш прокси!
     )
 
     return LangchainEmbeddingsWrapper(embeddings)
@@ -68,12 +76,8 @@ def create_proxy_embeddings(
 
 #     print("🔄 Тестирование RAGAS с прокси...")
 
-#     # Создаем прокси LLM
-#     proxy_llm = create_proxy_llm(
-#         model="gpt-4o-mini",
-#         api_key="sk-proxy-your-key",
-#         base_url="http://5.11.83.110:8000"
-#     )
+#     # Создаем прокси LLM (настройки из .env)
+#     proxy_llm = create_proxy_llm()
 
 #     print(f"✅ Прокси LLM создан")
 
@@ -82,9 +86,9 @@ def create_proxy_embeddings(
 
 #     # Тестовые данные
 #     sample = SingleTurnSample(
-#         user_input="What is the capital of France?",
-#         response="Paris is the capital of France.",
-#         retrieved_contexts=["Paris is the capital and largest city of France."]
+#         user_input="Какая столица Франции?",
+#         response="Париж — столица Франции.",
+#         retrieved_contexts=["Париж — столица и крупнейший город Франции."]
 #     )
 
 #     # Оцениваем

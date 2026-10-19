@@ -1,14 +1,19 @@
-from typing import List, Union, Optional
-from deepeval.test_case import LLMTestCase
-from deepeval.metrics import (
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from typing import List, Union  # noqa: E402
+from deepeval.test_case import LLMTestCase  # noqa: E402
+from deepeval.metrics import (  # noqa: E402
     AnswerRelevancyMetric,
     FaithfulnessMetric,
     ContextualRelevancyMetric,
     ContextualRecallMetric,
     ContextualPrecisionMetric
 )
-from deepeval import evaluate
-from deepeval_custom_llm import create_proxy_model, ProxyLLM
+from deepeval import evaluate  # noqa: E402
+from deepeval_custom_llm import create_proxy_model, ProxyLLM  # noqa: E402
 
 
 def create_metrics(
@@ -43,56 +48,38 @@ def create_metrics(
 
 if __name__ == "__main__":
 
-    # ============= ПРИМЕР 1: С обычной OpenAI =============
-    print("📊 Пример 1: Обычная OpenAI модель")
+    # ============= ПРИМЕР 1: Через кастомную прокси модель =============
+    print("📊 Пример 1: Метрики через прокси модель")
 
-    # Создаем метрики с обычной моделью
+    # Прокси-модель как судья (настройки берутся из .env)
+    proxy_model = create_proxy_model()
+
+    # Создаем метрики с прокси моделью
     metrics = create_metrics(
-        model="gpt-4o-mini",  # ← Обычная OpenAI
+        model=proxy_model,
         metrics_list=['answer_relevancy', 'faithfulness'],
         threshold=0.7
     )
 
     # Создаем тест кейс
     test_case = LLMTestCase(
-        input="What if these shoes don't fit?",
-        actual_output="We offer a 30-day full refund at no extra cost.",
-        expected_output="You are eligible for a 30 day full refund at no extra cost.",
+        input="Что делать, если эти туфли мне не подойдут?",
+        actual_output="Мы предлагаем полный возврат средств в течение 30 дней без дополнительной платы.",
+        expected_output="Вы можете вернуть товар в течение 30 дней с полным возвратом средств без дополнительной платы.",
         retrieval_context=[
-            "All customers are eligible for a 30 day full refund at no extra cost."]
+            "Все клиенты могут вернуть товар в течение 30 дней с полным возвратом средств без дополнительной платы."]
     )
 
     # Оцениваем (DeepEval сам выведет результаты)
     evaluate(test_cases=[test_case], metrics=metrics)
 
-    # ============= ПРИМЕР 2: С ПРОКСИ =============
-    # print("\n" + "="*60)
-    # print("📊 Пример 2: Кастомная прокси модель")
-
-    # # Создаем прокси модель
-    # proxy_model = create_proxy_model(
-    #     model="gpt-4o-mini",
-    #     api_key="sk-proxy-your-key",
-    #     base_url="http://5.11.83.110:8000"
-    # )
-
-    # # Создаем метрики с прокси моделью
-    # metrics = create_metrics(
-    #     model=proxy_model,  # ← Кастомная прокси модель
-    #     metrics_list=['answer_relevancy', 'faithfulness'],
-    #     threshold=0.7
-    # )
-
-    # # Оцениваем
-    # evaluate(test_cases=[test_case], metrics=metrics)
-
-    # ============= ПРИМЕР 3: Без wrapper функции =============
+    # ============= ПРИМЕР 2: Без wrapper функции =============
     print("\n" + "="*60)
-    print("📊 Пример 3: Прямое использование DeepEval (вообще без обертки)")
+    print("📊 Пример 2: Прямое использование DeepEval (без обертки)")
 
-    # Прямо создаем метрику
+    # Прямо создаем метрику с прокси моделью
     metric = AnswerRelevancyMetric(
-        model="gpt-4o-mini",  # Можно proxy_model или "gpt-4o-mini"
+        model=proxy_model,
         threshold=0.7,
         include_reason=True,
         async_mode=False

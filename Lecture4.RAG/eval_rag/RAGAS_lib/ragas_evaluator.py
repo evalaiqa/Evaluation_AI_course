@@ -1,18 +1,27 @@
 """
-RAGAS Evaluator с поддержкой прокси (упрощенная версия)
-"""
-from typing import List, Dict, Any, Optional
-import pandas as pd
-import asyncio
+RAGAS Evaluator с поддержкой прокси (упрощенная версия).
 
-from ragas.dataset_schema import SingleTurnSample
-from ragas.metrics import (
+По умолчанию работает через прокси; настройки берутся из .env
+через config.py (см. eval_rag/.env.example).
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from typing import List, Dict, Any, Optional  # noqa: E402
+import pandas as pd  # noqa: E402
+import asyncio  # noqa: E402
+
+from ragas.dataset_schema import SingleTurnSample  # noqa: E402
+from ragas.metrics import (  # noqa: E402
     LLMContextPrecisionWithReference,
     LLMContextRecall,
     ResponseRelevancy,
     Faithfulness
 )
-from ragas_proxy import create_proxy_llm, create_proxy_embeddings
+from ragas_proxy import create_proxy_llm, create_proxy_embeddings  # noqa: E402
+from config import model as default_model  # noqa: E402
 
 
 class RagasEvaluator:
@@ -20,9 +29,9 @@ class RagasEvaluator:
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = default_model,
         temperature: float = 0.0,
-        use_proxy: bool = False,
+        use_proxy: bool = True,
         proxy_api_key: Optional[str] = None,
         proxy_base_url: Optional[str] = None
     ):
@@ -32,9 +41,9 @@ class RagasEvaluator:
         Args:
             model: Название модели
             temperature: Температура
-            use_proxy: Использовать прокси
-            proxy_api_key: API ключ прокси
-            proxy_base_url: URL прокси
+            use_proxy: Использовать прокси (по умолчанию True)
+            proxy_api_key: API ключ прокси (по умолчанию из .env)
+            proxy_base_url: URL прокси (по умолчанию из .env)
         """
         self.model = model
         self.temperature = temperature
@@ -42,17 +51,18 @@ class RagasEvaluator:
 
         # Создаем LLM и embeddings
         if use_proxy:
-            print(f"🌐 Используется прокси: {proxy_base_url}")
+            # Настройки прокси берутся из .env (через config.py), если не переданы явно
             self.evaluator_llm = create_proxy_llm(
                 model=model,
-                api_key=proxy_api_key or "sk-proxy-your-key",
-                base_url=proxy_base_url or "http://5.11.83.110:8000",
+                api_key=proxy_api_key,
+                base_url=proxy_base_url,
                 temperature=temperature
             )
             self.evaluator_embeddings = create_proxy_embeddings(
-                api_key=proxy_api_key or "sk-proxy-your-key",
-                base_url=proxy_base_url or "http://5.11.83.110:8000"
+                api_key=proxy_api_key,
+                base_url=proxy_base_url
             )
+            print(f"🌐 Используется прокси для RAGAS")
         else:
             # Обычный OpenAI
             from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -166,29 +176,27 @@ class RagasEvaluator:
 #     # Просто список словарей!
 #     test_cases = [
 #         {
-#             'question': "What is the capital of France?",
-#             'answer': "Paris is the capital of France.",
-#             'contexts': ["Paris is the capital and largest city of France."],
-#             'ground_truth': "Paris"
+#             'question': "Какая столица Франции?",
+#             'answer': "Париж — столица Франции.",
+#             'contexts': ["Париж — столица и крупнейший город Франции."],
+#             'ground_truth': "Париж"
 #         },
-
-#         # Пример 2: Хороший ответ с дополнительной информацией
 #         {
-#             'question': "Who invented the telephone?",
-#             'answer': "Alexander Graham Bell invented the telephone in 1876.",
+#             'question': "Кто изобрёл телефон?",
+#             'answer': "Александр Белл изобрёл телефон в 1876 году.",
 #             'contexts': [
-#                 "Alexander Graham Bell was a Scottish-born inventor who is credited with inventing the telephone.",
-#                 "The first successful telephone call was made on March 10, 1876."
+#                 "Александр Грэм Белл — изобретатель, которому приписывают изобретение телефона.",
+#                 "Первый успешный телефонный звонок состоялся 10 марта 1876 года."
 #             ],
-#             'ground_truth': "Alexander Graham Bell"
+#             'ground_truth': "Александр Грэм Белл"
 #         }
 #     ]
 
-#     # Пример 1: С обычной OpenAI
+#     # Пример: через прокси (по умолчанию, настройки из .env)
 #     print("="*60)
-#     print("📊 Пример 1: Обычная OpenAI")
+#     print("📊 Пример: RAGAS через прокси")
 
-#     evaluator = RagasEvaluator(model="gpt-4o-mini", use_proxy=False)
+#     evaluator = RagasEvaluator()
 
 #     evaluator.configure_metrics({
 #         'faithfulness': {'enabled': True, 'threshold': 0.7},
@@ -198,39 +206,3 @@ class RagasEvaluator:
 #     df = evaluator.evaluate_batch(test_cases)
 #     print("\n✅ Результаты:")
 #     print(df)
-
-#     # Пример 2: С прокси
-#     print("\n" + "="*60)
-#     print("📊 Пример 2: Через прокси")
-
-#     evaluator_proxy = RagasEvaluator(
-#         model="gpt-4o-mini",
-#         use_proxy=True,
-#         proxy_api_key="sk-proxy-your-key",
-#         proxy_base_url="http://5.11.83.110:8000"
-#     )
-
-#     evaluator_proxy.configure_metrics({
-#         'faithfulness': {'enabled': True},
-#         'response_relevancy': {'enabled': True, 'threshold': 0.7}
-#     })
-
-#     df = evaluator_proxy.evaluate_batch(test_cases)
-#     print("\n✅ Результаты:")
-#     print(df)
-
-#     # Пример 3: Оценка одного случая напрямую
-#     print("\n" + "="*60)
-#     print("📊 Пример 3: Один случай")
-
-#     async def test_single():
-#         scores = await evaluator.evaluate_single(
-#             question="What is RAG?",
-#             answer="RAG stands for Retrieval-Augmented Generation.",
-#             contexts=[
-#                 "RAG is a technique that combines retrieval and generation."],
-#             ground_truth="RAG is Retrieval-Augmented Generation"
-#         )
-#         print(f"\n✅ Оценки: {scores}")
-
-#     asyncio.run(test_single())

@@ -6,8 +6,11 @@ openpyxl
 # HTTP requests
 requests
 
+# Configuration (.env)
+python-dotenv
+
 # Evaluation frameworks
-deepeval==4.0.7                       
+deepeval==4.1.8
 ragas
 opik
 eval-ai-library

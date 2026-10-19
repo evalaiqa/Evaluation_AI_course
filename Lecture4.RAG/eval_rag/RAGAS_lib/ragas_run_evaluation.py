@@ -1,25 +1,29 @@
 """
-Оценка RAG системы с использованием RAGAS метрик
-Загружает датасет из Excel, получает ответы от RAG и запускает оценку
+Оценка RAG системы с использованием RAGAS метрик.
+Загружает датасет из Excel, получает ответы от RAG и запускает оценку.
+
+Судья (LLM/эмбеддинги для метрик) работает через прокси; адрес RAG и прокси
+берутся из .env через config.py (см. eval_rag/.env.example).
 """
 
 import sys
-sys.path.insert(
-    0, '/Users/aleksandrmeskov/Desktop/AI evaluation/AI_practice/Lecture5/eval_rag')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import time  # noqa: E402
-import pandas as pd  # noqa: E402
-from typing import List, Dict, Any  # noqa: E402
+from typing import Dict, Any  # noqa: E402
 from dataset_parser import DatasetParser  # noqa: E402
 from rag_connector import RAGConnector  # noqa: E402
 from ragas_evaluator import RagasEvaluator  # noqa: E402
+from config import endpoint_url, api_key, model as default_model  # noqa: E402
 
 
 def evaluate_rag_with_ragas(
     excel_path: str,
     rag_connector: RAGConnector,
     metrics_config: Dict[str, Dict[str, Any]],
-    model: str = "gpt-4o-mini",
+    model: str = default_model,
     use_proxy: bool = True,
     proxy_api_key: str = None,
     proxy_base_url: str = None,
@@ -148,15 +152,15 @@ if __name__ == "__main__":
 
     # ============= НАСТРОЙКА =============
 
-    # 1. Инициализируем RAG коннектор
+    # 1. Инициализируем RAG коннектор (адрес и ключ из .env)
     rag_connector = RAGConnector(
-        endpoint_url="http://5.11.83.110:8002/api/v1/chat/",
-        api_key="rag-your-key",
+        endpoint_url=endpoint_url,
+        api_key=api_key,
         timeout=30
     )
 
     # 2. Указываем путь к Excel файлу
-    excel_path = "eval_rag/data/evaluation_dataset.xlsx"
+    excel_path = "data/evaluation_dataset.xlsx"
 
     # 3. Конфигурация метрик RAGAS
     metrics_config = {
@@ -174,10 +178,8 @@ if __name__ == "__main__":
         }
     }
 
-    # 4. Настройки прокси
+    # 4. Прокси включён по умолчанию; настройки берутся из .env
     use_proxy = True  # Измените на False для обычной OpenAI
-    proxy_api_key = "sk-proxy-your-key"
-    proxy_base_url = "http://5.11.83.110:8000"
 
     # ============= ЗАПУСК ОЦЕНКИ =============
 
@@ -185,10 +187,7 @@ if __name__ == "__main__":
         excel_path=excel_path,
         rag_connector=rag_connector,
         metrics_config=metrics_config,
-        model="gpt-4o-mini",
         use_proxy=use_proxy,
-        proxy_api_key=proxy_api_key,
-        proxy_base_url=proxy_base_url,
         sleep_time=0.1
     )
 

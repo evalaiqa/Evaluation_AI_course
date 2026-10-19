@@ -1,11 +1,19 @@
 """
-Кастомная модель DeepEval для работы через прокси сервер
-Следует официальной документации DeepEval
+Кастомная модель DeepEval для работы через прокси сервер.
+Следует официальной документации DeepEval.
+
+Настройки прокси (PROXY_BASE_URL / PROXY_API_KEY / MODEL) берутся из .env
+через config.py (см. eval_rag/.env.example).
 """
-import os
-from typing import Optional, Dict, Any
-from openai import OpenAI
-from deepeval.models.base_model import DeepEvalBaseLLM
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from typing import Optional  # noqa: E402
+from openai import OpenAI  # noqa: E402
+from deepeval.models.base_model import DeepEvalBaseLLM  # noqa: E402
+from config import proxy_base_url, proxy_api_key, model as default_model  # noqa: E402
 
 
 class ProxyLLM(DeepEvalBaseLLM):
@@ -15,7 +23,7 @@ class ProxyLLM(DeepEvalBaseLLM):
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = default_model,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         temperature: float = 0.1
@@ -24,18 +32,12 @@ class ProxyLLM(DeepEvalBaseLLM):
         self._model_name = model
         self.temperature = temperature
 
-        # Получаем настройки из переменных окружения или используем переданные
-        self.api_key = api_key or os.getenv(
-            "PROXY_API_KEY",
-            "sk-proxy-your-key"
-        )
-        self.base_url = base_url or os.getenv(
-            "PROXY_BASE_URL",
-            "http://5.11.83.110:8000"
-        )
+        # Берём настройки из аргументов или из .env (через config.py)
+        self.api_key = api_key or proxy_api_key
+        self.base_url = base_url or proxy_base_url
 
         # Создаем клиент OpenAI с прокси настройками
-        # ВАЖНО: Ваш прокси использует Bearer токен в Authorization
+        # ВАЖНО: прокси использует Bearer токен в Authorization
         self.client = OpenAI(
             # Это попадет в Authorization: Bearer {api_key}
             api_key=self.api_key,
@@ -79,7 +81,7 @@ class ProxyLLM(DeepEvalBaseLLM):
 
 
 def create_proxy_model(
-    model: str = "gpt-4o-mini",
+    model: str = default_model,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     temperature: float = 0.1
@@ -91,31 +93,3 @@ def create_proxy_model(
         base_url=base_url,
         temperature=temperature
     )
-
-
-# Тестирование модели при запуске файла напрямую
-if __name__ == "__main__":
-    # Тест прокси модели
-    print("🔄 Тестирование ProxyLLM...")
-
-    # Создаем модель
-    proxy_model = create_proxy_model(
-        model="gpt-4o-mini",
-        api_key="sk-proxy-your-key",
-        base_url="http://5.11.83.110:8000"
-    )
-
-    # Тестовый промпт
-    test_prompt = "Explain what is RAG in one sentence."
-
-    print(f"\n📝 Промпт: {test_prompt}")
-    print(f"🤖 Модель: {proxy_model.get_model_name()}")
-    print(f"🌐 Прокси: {proxy_model.base_url}")
-    print(f"🔑 API Key: {proxy_model.api_key[:20]}...")
-
-    # Генерируем ответ
-    try:
-        response = proxy_model.generate(test_prompt)
-        print(f"\n✅ Ответ: {response}")
-    except Exception as e:
-        print(f"\n❌ Ошибка: {e}")

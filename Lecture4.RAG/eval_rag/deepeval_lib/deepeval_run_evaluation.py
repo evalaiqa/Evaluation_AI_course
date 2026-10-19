@@ -146,7 +146,7 @@ if __name__ == "__main__":
     proxy_model = create_proxy_model()
 
     # 3. Указываем путь к Excel файлу
-    excel_path = "data/evaluation_dataset.xlsx"
+    excel_path = "Lecture4.RAG/eval_rag/data/evaluation_dataset_happy_path.xlsx"
 
     # 4. Выбираем метрики для оценки
     metrics_to_use = [
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         excel_path=excel_path,
         rag_connector=rag_connector,
         metrics_list=metrics_to_use,
-        model=proxy_model,
+        model=proxy_model,  # Можно использовать proxy_model или указать модель напрямую
         threshold=0.7,
         sleep_time=0.1
     )

@@ -68,36 +68,3 @@ class RAGConnector:
 
         print(f"✅ Обработано {len(results)} вопросов")
         return results
-
-
-# # ==================== ПРИМЕР ИСПОЛЬЗОВАНИЯ ====================
-
-# if __name__ == "__main__":
-
-#     # Инициализируем коннектор
-#     connector = RAGConnector(
-#         endpoint_url="http://5.11.83.110:8002/api/v1/chat/",
-#         api_key="rag-api-key"
-#     )
-
-#     # Вопросы
-#     questions = [
-#         'Какие методы используется в product_service?',
-#         'Как работает процесс авторизации?'
-#     ]
-
-#     # Ожидаемые ответы
-#     expected = [
-#         'В процессе тестирования участвуют представители бизнес-подразделений, разработчики и тестировщики.',
-#         'Разработчик оказывает помощь в прохождении тестовых сценариев, консультирует по подготовке данных.'
-#     ]
-
-#     # Получаем ответы
-#     results = connector.batch_query(questions, expected)
-
-#     print("\n=== Результаты ===")
-#     for res in results:
-#         print(f"\nВопрос: {res['question']}")
-#         print(f"Ответ RAG: {res['answer']}")
-#         print(f"Ожидаемый ответ: {res['ground_truth']}")
-#         print(f"Контексты: {res['contexts']}")

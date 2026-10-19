@@ -63,8 +63,83 @@ class OpikProxyLLM(OpikBaseModel):
         Генерация строки через прокси (основной метод для метрик Opik)
         """
         messages = [{"role": "user", "content": input}]
-        response = self.generate_provider_response(messages, **kwargs)
-        return response.choices[0].message.content
+        return self._chat(messages, response_format=response_format, **kwargs)
+
+    def generate_chat_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        response_format: Optional[Type[pydantic.BaseModel]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Генерация ответа ассистента из списка сообщений с ролями.
+        Этот метод вызывают метрики answer_relevance / hallucination и др.
+        Возвращает dict в формате {"role": "assistant", "content": <str>}.
+        """
+        content = self._chat(messages, response_format=response_format, **kwargs)
+        return {"role": "assistant", "content": content}
+
+    async def agenerate_chat_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        response_format: Optional[Type[pydantic.BaseModel]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        # Клиент OpenAI синхронный — для простоты переиспользуем sync-версию.
+        return self.generate_chat_completion(
+            messages, response_format=response_format, **kwargs
+        )
+
+    async def agenerate_string(
+        self,
+        input: str,
+        response_format: Optional[Type[pydantic.BaseModel]] = None,
+        **kwargs: Any,
+    ) -> str:
+        return self.generate_string(input, response_format=response_format, **kwargs)
+
+    def _chat(
+        self,
+        messages: List[Dict[str, Any]],
+        response_format: Optional[Type[pydantic.BaseModel]] = None,
+        **kwargs: Any,
+    ) -> str:
+        """
+        Общий вызов chat completions. Если задан response_format (pydantic-схема) —
+        используем structured output, чтобы получить валидный JSON (его потом
+        парсят метрики Opik). Иначе — обычная генерация.
+        """
+        try:
+            if response_format is not None:
+                try:
+                    # Нативный structured output OpenAI
+                    response = self.client.beta.chat.completions.parse(
+                        model=self.model_name,
+                        messages=messages,
+                        temperature=self.temperature,
+                        response_format=response_format,
+                    )
+                    return response.choices[0].message.content
+                except Exception:
+                    # Фолбэк для прокси без parse: JSON-mode
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        temperature=self.temperature,
+                        response_format={"type": "json_object"},
+                    )
+                    return response.choices[0].message.content
+
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=self.temperature,
+            )
+            return response.choices[0].message.content
+
+        except Exception as e:
+            print(f"❌ Ошибка при генерации через прокси: {e}")
+            raise
 
     def generate_provider_response(
         self, messages: List[Dict[str, Any]], **kwargs: Any

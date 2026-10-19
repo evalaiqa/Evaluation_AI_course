@@ -13,6 +13,26 @@ from typing import List, Dict, Any, Optional  # noqa: E402
 import pandas as pd  # noqa: E402
 import asyncio  # noqa: E402
 
+# --- Фикс совместимости ragas 0.4.3 ↔ langchain-community 0.4.x ---
+# ragas безусловно импортит langchain_community.chat_models.vertexai,
+# но этот модуль удалён в langchain-community 0.4.x. Vertex мы не используем
+# (работаем через OpenAI-прокси), поэтому подкладываем заглушку до импорта ragas.
+import types  # noqa: E402
+
+if "langchain_community.chat_models.vertexai" not in sys.modules:
+    try:
+        import langchain_community.chat_models.vertexai  # noqa: F401,E402
+    except ModuleNotFoundError:
+        _vertexai_stub = types.ModuleType(
+            "langchain_community.chat_models.vertexai")
+
+        class ChatVertexAI:  # заглушка, не используется
+            pass
+
+        _vertexai_stub.ChatVertexAI = ChatVertexAI
+        sys.modules["langchain_community.chat_models.vertexai"] = _vertexai_stub
+# --- конец фикса ---
+
 from ragas.dataset_schema import SingleTurnSample  # noqa: E402
 from ragas.metrics import (  # noqa: E402
     LLMContextPrecisionWithReference,

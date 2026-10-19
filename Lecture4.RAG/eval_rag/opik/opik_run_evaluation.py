@@ -26,7 +26,7 @@ def evaluate_rag_with_opik(
     dataset_name: str,
     rag_connector: RAGConnector,
     metrics_list: List[str],
-    experiment_name: str = "v_1_RAG_Evaluation",
+    experiment_name: str = "v_2_RAG_Evaluation",
     project_name: str = "Test evaluation",
     model: Optional[Union[str, OpikProxyLLM]] = None,
     sleep_time: float = 0.1
@@ -111,8 +111,8 @@ if __name__ == "__main__":
         timeout=30
     )
 
-    dataset_name = "simple_test_dataset_v4"
-    experiment_name = "RAG_Evaluation_From_Dataset_v7"
+    dataset_name = "evaluation_dataset_happy_path_2026-08-21"
+    experiment_name = "RAG_Evaluation_From_Dataset_v8"
     project_name = "Test evaluation"
 
     metrics_to_use = [

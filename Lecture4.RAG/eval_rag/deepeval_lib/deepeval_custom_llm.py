@@ -10,8 +10,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from typing import Optional  # noqa: E402
+from typing import Optional, Type  # noqa: E402
 from openai import OpenAI  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 from deepeval.models.base_model import DeepEvalBaseLLM  # noqa: E402
 from config import proxy_base_url, proxy_api_key, model as default_model  # noqa: E402
 
@@ -54,7 +55,12 @@ class ProxyLLM(DeepEvalBaseLLM):
         """
         return self.client
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompt: str, schema: Optional[Type[BaseModel]] = None):
+        # Если DeepEval просит ответ по схеме — используем structured output,
+        # чтобы гарантированно получить валидный JSON (а не парсить строку руками).
+        if schema is not None:
+            return self._generate_with_schema(prompt, schema)
+
         try:
             response = self.client.chat.completions.create(
                 model=self._model_name,
@@ -68,10 +74,38 @@ class ProxyLLM(DeepEvalBaseLLM):
             print(f"❌ Ошибка при генерации через прокси: {e}")
             raise
 
-    async def a_generate(self, prompt: str) -> str:
+    def _generate_with_schema(self, prompt: str, schema: Type[BaseModel]) -> BaseModel:
+        """
+        Возвращает ответ судьи как объект pydantic-схемы.
+        Так DeepEval не вызывает ручной парсинг JSON (trimAndLoadJson),
+        который и падал на кривом выводе gpt-4o-mini.
+        """
+        try:
+            # Нативный structured output OpenAI (response_format = схема)
+            response = self.client.beta.chat.completions.parse(
+                model=self._model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
+                response_format=schema,
+            )
+            return response.choices[0].message.parsed
+
+        except Exception:
+            # Фолбэк для прокси без поддержки parse: включаем JSON-mode
+            # и валидируем ответ самой схемой.
+            response = self.client.chat.completions.create(
+                model=self._model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content
+            return schema.model_validate_json(content)
+
+    async def a_generate(self, prompt: str, schema: Optional[Type[BaseModel]] = None):
         # DeepEval может использовать async для параллельной оценки
         # Для простоты используем синхронную версию
-        return self.generate(prompt)
+        return self.generate(prompt, schema)
 
     def get_model_name(self) -> str:
         """

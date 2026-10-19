@@ -160,7 +160,7 @@ if __name__ == "__main__":
     )
 
     # 2. Указываем путь к Excel файлу
-    excel_path = "data/evaluation_dataset.xlsx"
+    excel_path = "Lecture4.RAG/eval_rag/data/evaluation_dataset_happy_path.xlsx"
 
     # 3. Конфигурация метрик RAGAS
     metrics_config = {

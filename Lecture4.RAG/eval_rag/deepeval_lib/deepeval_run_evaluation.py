@@ -161,7 +161,7 @@ if __name__ == "__main__":
         excel_path=excel_path,
         rag_connector=rag_connector,
         metrics_list=metrics_to_use,
-        model=proxy_model,  # Можно использовать proxy_model или указать модель напрямую
+        model="gpt-4.1-mini",  # Можно использовать proxy_model или указать модель напрямую
         threshold=0.7,
         sleep_time=0.1
     )

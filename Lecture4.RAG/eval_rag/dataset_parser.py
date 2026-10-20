@@ -126,33 +126,3 @@ class DatasetParser:
             else:
                 print("Ожидаемый ответ: Не задан")
         print("=" * 50)
-
-
-# Пример использования
-if __name__ == "__main__":
-    # Создаем парсер
-    parser = DatasetParser()
-
-    # Загружаем датасет
-    file_path = "data/evaluation_dataset.xlsx"  # замените на свой путь
-    df = parser.load_dataset(file_path)
-
-    if df is not None:
-        # Показываем информацию о датасете
-        info = parser.validate_dataset(df)
-        print("\n=== Информация о датасете ===")
-        print(f"Всего строк: {info['total_rows']}")
-        print(f"Валидных пар: {info['valid_pairs']}")
-        print(f"Пустых вопросов: {info['empty_questions']}")
-        print(f"Пустых ответов: {info['empty_responses']}")
-        print(
-            f"Средняя длина вопроса: {info['avg_question_length']:.1f} символов")
-        print(
-            f"Средняя длина ответа: {info['avg_response_length']:.1f} символов")
-
-        # Показываем превью
-        parser.preview_dataset(df)
-
-        # Получаем пары вопрос-ответ
-        pairs = parser.get_question_response_pairs(df)
-        print(f"\nПолучено {len(pairs)} пар вопрос-ответ")

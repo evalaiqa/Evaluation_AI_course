@@ -48,7 +48,7 @@ def evaluate_rag_with_opik(
     rag_results = []
 
     for i, item in enumerate(source_items, 1):
-        question = item.get("input") or item.get("question", "")
+        question = item.get("query") or item.get("question", "")
         expected_output = item.get("expected_output", "")
 
         print(f"  [{i}/{len(source_items)}] {question[:60]}...")
@@ -111,8 +111,8 @@ if __name__ == "__main__":
         timeout=30
     )
 
-    dataset_name = "evaluation_dataset_happy_path_2026-08-21"
-    experiment_name = "RAG_Evaluation_From_Dataset_v8"
+    dataset_name = "prompta_2026-10-21"
+    experiment_name = "RAG_Evaluation_From_Dataset_v1"
     project_name = "Test evaluation"
 
     metrics_to_use = [

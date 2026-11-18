@@ -7,3 +7,4 @@ __pycache__/
 Lecture4.RAG/myenv
 Lecture4.RAG/.env.local
 Lecture4.RAG/eval_rag/.env
+Lecture6.Multiturn_and_Miltimodal/multimodal_eval/.env

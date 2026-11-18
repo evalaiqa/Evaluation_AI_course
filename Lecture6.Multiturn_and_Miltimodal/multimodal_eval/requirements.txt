@@ -1,16 +1,14 @@
 # Мультимодальная оценка изображений
 # Multimodal Image Evaluation
 #
-# ВАЖНО: этот блок несовместим с deepeval 4.x, потому что в 4.0
-# были удалены MLLMTestCase, DeepEvalBaseMLLM и мультимодальные
-# метрики (MultimodalAnswerRelevancyMetric и др.). Поэтому
-# multimodal_eval нужно ставить в ОТДЕЛЬНЫЙ venv, а не в общий
-# для остальных лекций (там deepeval==4.0.7).
-#
-# Пример:
-#   cd Lecture6.Multiturn_and_Miltimodal/multimodal_eval
-#   python3 -m venv .venv-multimodal && source .venv-multimodal/bin/activate
-#   pip install -r requirements.txt
+# Блок переписан под DeepEval 4.x API (LLMTestCase + метрики
+# ImageCoherence / ImageHelpfulness / ImageReference / TextToImage).
+# Кастомный ProxyMLLM больше не нужен: в 4.x нативный OpenAIModel умеет
+# vision и принимает base_url / api_key, поэтому прокси-судья создаётся
+# через create_proxy_model (см. metrics/deepeval_custom_llm.py).
+# Настройки прокси — в переменных окружения PROXY_API_KEY / PROXY_BASE_URL.
+# Версия совместима с остальными лекциями курса (deepeval 4.x),
+# отдельный venv не требуется.
 
 # PyTorch (CPU-only версия для экономии места)
 torch>=2.0.0
@@ -23,10 +21,8 @@ lpips>=0.1.4
 # Transformers для CLIP
 transformers>=4.30.0
 
-# DeepEval для мультимодальных метрик.
-# Пин на 3.x — в 4.0 удалены MLLMTestCase / DeepEvalBaseMLLM /
-# MultimodalAnswerRelevancyMetric, на которых держится этот блок.
-deepeval>=3.0,<4.0
+# DeepEval для мультимодальных метрик (4.x API).
+deepeval>=4.0
 
 # Работа с изображениями
 Pillow>=9.0.0
